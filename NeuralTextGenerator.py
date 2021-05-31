@@ -53,8 +53,8 @@ class BertTextGenerator:
     def __init__(self, model_version, device = DEFAULT_DEVICE):
         self.device = device
         self.model_version = model_version
-
         self.model = AutoModelForMaskedLM.from_pretrained(model_version)
+        self.model.to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(model_version, do_lower_case= "uncased" in model_version)
 
 
