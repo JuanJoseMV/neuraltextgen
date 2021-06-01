@@ -131,6 +131,8 @@ class BertTextGenerator:
 
         if method == 'masked':
             batch = [seed_text + [self.tokenizer.mask_token] * max_len + [self.tokenizer.sep_token] for _ in range(batch_size)]
+        elif method == 'random':
+            batch = [seed_text + np.random.choice(list(self.tokenizer.vocab.keys()), max_len).tolist() + [self.tokenizer.sep_token] for _ in range(batch_size)]
 
         # if rand_init:
         #    for ii in range(max_len):
@@ -227,7 +229,7 @@ if __name__ == '__main__':
                   'sample': True,
                   'max_iter': 100,
                   'seed_text': "",
-                  'init_method':'masked'
+                  'init_method':'random'
                   }
 
     # "key1=val1_key2=val2_...txt"
