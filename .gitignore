@@ -129,4 +129,4 @@ dmypy.json
 .pyre/
 
 # Data folder contents
-data/*
+data/wikitext-103/wiki.train.tokens
