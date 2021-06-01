@@ -2,8 +2,6 @@ import math
 import time
 import torch
 import numpy as np
-import re
-from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
 from transformers import AutoModelForMaskedLM, AutoTokenizer, AutoModel, BertConfig, AutoConfig
 
 DEFAULT_DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
