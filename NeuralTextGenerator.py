@@ -4,6 +4,14 @@ import torch
 import numpy as np
 from transformers import AutoModelForMaskedLM, AutoTokenizer, AutoModel, BertConfig, AutoConfig
 
+try:
+    from apex import amp
+    APEX_AVAILABLE = True
+except ModuleNotFoundError:
+    APEX_AVAILABLE = False
+
+
+
 DEFAULT_DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 CLS = '[CLS]'
 SEP = '[SEP]'
@@ -48,11 +56,17 @@ def write_sents(out_file, sents, should_detokenize=False):
 
 
 class BertTextGenerator:
-    def __init__(self, model_version, device = DEFAULT_DEVICE):
+    def __init__(self, model_version, device = DEFAULT_DEVICE, use_apex = False):
         self.device = device
         self.model_version = model_version
         self.model = AutoModelForMaskedLM.from_pretrained(model_version)
         self.model.to(self.device)
+
+        if use_apex and APEX_AVAILABLE:
+            optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
+            self.model, optimizer = amp.initialize(self.model, optimizer, opt_level="O2", keep_batchnorm_fp32=True,
+                                                   loss_scale="dynamic")
+
         self.tokenizer = AutoTokenizer.from_pretrained(model_version, do_lower_case= "uncased" in model_version)
 
 
@@ -75,7 +89,7 @@ class BertTextGenerator:
 
             with torch.no_grad():
                 inp = torch.tensor(batch).to(self.device)
-                out = self.model(inp).logits
+                out = self.model(inp)['logits']
                 topk = top_k if (ii >= burnin) else 0
                 idxs = self.generate_step(out, gen_idx=seed_len + kk, top_k=topk, temperature=temperature, sample=(ii < burnin))
                 for jj in range(batch_size):
@@ -167,7 +181,7 @@ class BertTextGenerator:
         segments_tensors = torch.tensor([segments_ids]).to(self.device)
 
         with torch.no_grad():
-            out = self.model(tokens_tensor, segments_tensors).logits
+            out = self.model(tokens_tensor, segments_tensors)['logits']
 
             predicted_index = torch.argmax(out[0, masked_index]).item()
             predicted_token = self.tokenizer.convert_ids_to_tokens([predicted_index])
