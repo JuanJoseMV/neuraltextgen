@@ -101,15 +101,59 @@ class BertTextGenerator:
                     print("iter", ii + 1, " ".join(for_print))
 
         return untokenize_batch(batch, self.tokenizer)
+    
+    def parallel_generation(seed_text, max_len=15, top_k=0, temperature=None, max_iter=300, sample=True, 
+                        cuda=False, print_every=10, verbose=True, method = "masked"):
+        """ Generate for all positions at a time step """
+        seed_len = len(seed_text)
+        batch = get_init_text(seed_text, max_len, batch_size, method = method)
+    
+        for ii in range(max_iter):
+            inp = torch.tensor(batch).cuda() if cuda else torch.tensor(batch)
+            out = model(inp)
+            for kk in range(max_len):
+                idxs = generate_step(out, gen_idx=seed_len+kk, top_k=top_k, temperature=temperature, sample=sample)
+                for jj in range(batch_size):
+                    batch[jj][seed_len+kk] = idxs[jj]
+            
+            if verbose and np.mod(ii, print_every) == 0:
+                print("iter", ii+1, " ".join(tokenizer.convert_ids_to_tokens(batch[0])))
+    
+        return untokenize_batch(batch)
+            
+    def sequential_generation(seed_text, batch_size=2, max_len=15, leed_out_len=15, 
+                          top_k=0, temperature=None, sample=True, cuda=False, verbose=True, print_every=10, method = "masked"):
+        """ Generate one word at a time, in L->R order """
+        seed_len = len(seed_text)
+        batch = get_init_text(seed_text, max_len, batch_size, method = method)
+            
+        for ii in range(max_len):
+            inp = [sent[:seed_len+ii+leed_out_len]+[sep_id] for sent in batch]
+            inp = torch.tensor(batch).cuda() if cuda else torch.tensor(batch)
+            out = model(inp)
+            idxs = generate_step(out, gen_idx=seed_len+ii, top_k=top_k, temperature=temperature, sample=sample)
+            for jj in range(batch_size):
+                batch[jj][seed_len+ii] = idxs[jj]
 
-    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked'):
+            if verbose and np.mod(ii, print_every) == 0:
+                print("iter", ii+1, " ".join(tokenizer.convert_ids_to_tokens(batch[0])))
+        
+        return untokenize_batch(batch)
+
+    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked', generation_method = "parallel sequential"):
 
         n_batches = math.ceil(n_samples / batch_size)
         start_time = time.time()
 
         for batch_n in range(n_batches):
-            batch = self.parallel_sequential_generation(self.tokenizer.cls_token+seed_text, max_len=max_len, top_k=top_k, batch_size=batch_size,
-                                                   temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=False, init_method=init_method)
+            if generation_method = "parallel sequential":
+                batch = self.parallel_sequential_generation(self.tokenizer.cls_token+seed_text, max_len=max_len, top_k=top_k, batch_size=batch_size, 
+                                                            temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=False, init_method=init_method)
+            elif generation_method = "sequential":
+                batch = sequential_generation(seed_text, batch_size=20, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=leed_out_len,
+                                              sample=sample, cuda = cuda, method= method)
+            elif generation_method = "parallel":
+                batch = parallel_generation(seed_text, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, cuda = cuda, method = method)
 
             if (batch_n + 1) % print_every == 0:
                 print("Finished batch %d in %.3fs" % (batch_n + 1, time.time() - start_time))
