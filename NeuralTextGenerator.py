@@ -71,7 +71,7 @@ class BertTextGenerator:
 
 
     def parallel_sequential_generation(self, seed_text, batch_size, max_len=15, top_k=0, temperature=None, max_iter=300, burnin=200,
-                                       cuda=False, print_every=10, verbose=True, init_method='masked'):
+                                       cuda=False, print_every=50, verbose=True, init_method='masked'):
         """ Generate for one random position at a timestep
         args:
             - burnin: during burn-in period, sample from full distribution; afterwards take argmax
@@ -99,6 +99,7 @@ class BertTextGenerator:
                     for_print = self.tokenizer.convert_ids_to_tokens(batch[0])
                     for_print = for_print[:seed_len + kk + 1] + ['(*)'] + for_print[seed_len + kk + 1:]
                     print("iter", ii + 1, " ".join(for_print))
+                    print("iter", ii+1, " ".join(tokenizer.convert_ids_to_tokens(batch[0])))
 
         return untokenize_batch(batch, self.tokenizer)
     
