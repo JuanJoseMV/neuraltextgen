@@ -103,7 +103,7 @@ class BertTextGenerator:
 
         return untokenize_batch(batch, self.tokenizer)
     
-    def parallel_generation(seed_text, max_len=15, top_k=0, temperature=None, max_iter=300, sample=True, 
+    def parallel_generation(self, seed_text, max_len=15, top_k=0, temperature=None, max_iter=300, sample=True, 
                         cuda=False, print_every=10, verbose=True, method = "masked"):
         """ Generate for all positions at a time step """
         seed_len = len(seed_text)
@@ -122,7 +122,7 @@ class BertTextGenerator:
     
         return untokenize_batch(batch)
             
-    def sequential_generation(seed_text, batch_size=2, max_len=15, leed_out_len=15, 
+    def sequential_generation(self, seed_text, batch_size=2, max_len=15, leed_out_len=15, 
                           top_k=0, temperature=None, sample=True, cuda=False, verbose=True, print_every=10, method = "masked"):
         """ Generate one word at a time, in L->R order """
         seed_len = len(seed_text)
@@ -141,7 +141,7 @@ class BertTextGenerator:
         
         return untokenize_batch(batch)
 
-    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked', generation_method = "parallel sequential"):
+    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked', generation_method = "parallel sequential", verbose = False):
 
         n_batches = math.ceil(n_samples / batch_size)
         start_time = time.time()
@@ -149,7 +149,7 @@ class BertTextGenerator:
         for batch_n in range(n_batches):
             if generation_method == "parallel sequential":
                 batch = self.parallel_sequential_generation(self.tokenizer.cls_token+seed_text, max_len=max_len, top_k=top_k, batch_size=batch_size, 
-                                                            temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=False, init_method=init_method)
+                                                            temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=verbose, init_method=init_method)
             elif generation_method == "sequential":
                 batch = sequential_generation(seed_text, batch_size=20, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=leed_out_len,
                                               sample=sample, cuda = cuda, method= method)
