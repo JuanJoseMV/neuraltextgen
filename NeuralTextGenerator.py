@@ -126,17 +126,20 @@ class BertTextGenerator:
 
 
 
-    def get_init_text(self, seed_text, max_len, batch_size=1, method=''):
+    def get_init_text(self, seed_text, max_len, batch_size=1, method='', masked_prob=0.9):
         """ Get initial sentence by padding seed_text with either masks or random words to max_len """
 
         if method == 'masked':
             batch = [seed_text + [self.tokenizer.mask_token] * max_len + [self.tokenizer.sep_token] for _ in range(batch_size)]
         elif method == 'random':
             batch = [seed_text + np.random.choice(list(self.tokenizer.vocab.keys()), max_len).tolist() + [self.tokenizer.sep_token] for _ in range(batch_size)]
+        elif method == 'mixed':
+            p = [(1 - masked_prob) / (self.tokenizer.vocab_size - 1)] * self.tokenizer.vocab_size
+            p[self.tokenizer.mask_token_id] = masked_prob
+            batch = [seed_text + self.tokenizer.convert_ids_to_tokens(
+                np.random.choice(np.arange(self.tokenizer.vocab_size), max_len, p=p)) + [self.tokenizer.sep_token] for _
+                     in range(batch_size)]
 
-        # if rand_init:
-        #    for ii in range(max_len):
-        #        init_idx[seed_len+ii] = np.random.randint(0, len(tokenizer.vocab))
 
         return tokenize_batch(batch, self.tokenizer)
 
