@@ -69,14 +69,16 @@ class BertTextGenerator:
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_version, do_lower_case= "uncased" in model_version)
 
-    def parallel_sequential_generation(self, seed_text, batch_size, max_len=15, top_k=0, temperature=None, max_iter=300, burnin=200,sample=True,print_every=10, verbose=True, init_method='masked', masked_prob=0.9):
+
+    def parallel_sequential_generation(self, seed_text, batch_size, max_len=15, top_k=0, temperature=None, max_iter=300, burnin=200,
+                                       cuda=False, print_every=50, verbose=True, init_method='masked', masked_prob=0.9):
         """ Generate for one random position at a timestep
         args:
             - burnin: during burn-in period, sample from full distribution; afterwards take argmax
         """
         seed_text = self.tokenizer.tokenize(seed_text)
         seed_len = len(seed_text)
-        batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method)
+        batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method, masked_prob=masked_prob)
 
         for ii in range(max_iter):
             kk = np.random.randint(0, max_len)
@@ -97,18 +99,64 @@ class BertTextGenerator:
                     for_print = self.tokenizer.convert_ids_to_tokens(batch[0])
                     for_print = for_print[:seed_len + kk + 1] + ['(*)'] + for_print[seed_len + kk + 1:]
                     print("iter", ii + 1, " ".join(for_print))
+                    print("iter", ii+1, " ".join(self.tokenizer.convert_ids_to_tokens(batch[0])))
 
         return untokenize_batch(batch, self.tokenizer)
 
+    def parallel_generation(self, seed_text, batch_size, max_len=15, top_k=0, temperature=None, max_iter=300, sample=True,
+                        cuda=False, print_every=10, verbose=True, init_method='masked', masked_prob=0.9):
+        """ Generate for all positions at a time step """
+        seed_text = self.tokenizer.tokenize(seed_text)
+        seed_len = len(seed_text)
+        batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method, masked_prob=masked_prob)
 
-    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked', masked_prob=0.9):
+        for ii in range(max_iter):
+            inp = torch.tensor(batch).to(self.device)
+            out = self.model(inp)['logits']
+            for kk in range(max_len):
+                idxs = self.generate_step(out, gen_idx=seed_len+kk, top_k=top_k, temperature=temperature, sample=sample)
+                for jj in range(batch_size):
+                    batch[jj][seed_len+kk] = idxs[jj]
+
+            if verbose and np.mod(ii, print_every) == 0:
+                print("iter", ii+1, " ".join(self.tokenizer.convert_ids_to_tokens(batch[0])))
+
+        return untokenize_batch(batch, self.tokenizer)
+
+    def sequential_generation(self, seed_text, batch_size, max_len=15, leed_out_len=15,
+                          top_k=0, temperature=None, sample=True, cuda=False, verbose=True, print_every=10, init_method = "masked",  masked_prob=0.9):
+        """ Generate one word at a time, in L->R order """
+        seed_text = self.tokenizer.tokenize(seed_text)
+        seed_len = len(seed_text)
+        batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method, masked_prob=masked_prob)
+
+        for ii in range(max_len):
+            inp = [sent[:seed_len+ii+leed_out_len]+[self.tokenizer.sep_token] for sent in batch]
+            inp = torch.tensor(batch).to(self.device)
+            out = self.model(inp)['logits']
+            idxs = self.generate_step(out, gen_idx=seed_len+ii, top_k=top_k, temperature=temperature, sample=sample)
+            for jj in range(batch_size):
+                batch[jj][seed_len+ii] = idxs[jj]
+
+            if verbose and np.mod(ii, print_every) == 0:
+                print("iter", ii+1, " ".join(self.tokenizer.convert_ids_to_tokens(batch[0])))
+
+        return untokenize_batch(batch, self.tokenizer)
+
+    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked', masked_prob=0.9, generation_method = "parallel sequential", verbose = False):
 
         n_batches = math.ceil(n_samples / batch_size)
         start_time = time.time()
 
         for batch_n in range(n_batches):
-            batch = self.parallel_sequential_generation(self.tokenizer.cls_token+seed_text, max_len=max_len, top_k=top_k, batch_size=batch_size,sample=sample,
-                                                        temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=False, init_method=init_method,masked_prob=masked_prob)
+            if generation_method == "parallel sequential":
+                batch = self.parallel_sequential_generation(self.tokenizer.cls_token+seed_text, max_len=max_len, top_k=top_k, batch_size=batch_size,
+                                                            temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=verbose, init_method=init_method, masked_prob=masked_prob)
+            elif generation_method == "sequential":
+                batch = self.sequential_generation(self.tokenizer.cls_token+seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=15,
+                                              sample=sample, init_method= init_method, masked_prob=masked_prob)
+            elif generation_method == "parallel":
+                batch = self.parallel_generation(self.tokenizer.cls_token+seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, init_method = init_method, masked_prob=masked_prob)
 
             if (batch_n + 1) % print_every == 0:
                 print("Finished batch %d in %.3fs" % (batch_n + 1, time.time() - start_time))
@@ -141,6 +189,7 @@ class BertTextGenerator:
 
 
         return tokenize_batch(batch, self.tokenizer)
+
 
     def generate_step(self, out, gen_idx, temperature=None, top_k=0, sample=False, return_list=True):
         """ Generate a word from from out[gen_idx]
@@ -247,11 +296,11 @@ if __name__ == '__main__':
         print(f"\t{sent}")
 
 
-    # print('\n\n ITALIAN TEXT GENERATION')
-    # it_bert_sents = it_bert_model.generate(**parameters)
-    # print("\nItalian text generated: ")
-    # for sent in it_bert_sents:
-    #     print(f"\t{sent}")
+    print('\n\n ITALIAN TEXT GENERATION')
+    it_bert_sents = it_bert_model.generate(**parameters)
+    print("\nItalian text generated: ")
+    for sent in it_bert_sents:
+        print(f"\t{sent}")
 
 
 
