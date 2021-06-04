@@ -106,8 +106,9 @@ class BertTextGenerator:
     def parallel_generation(self, seed_text, batch_size, max_len=15, top_k=0, temperature=None, max_iter=300, sample=True, 
                         cuda=False, print_every=10, verbose=True, init_method='masked'):
         """ Generate for all positions at a time step """
+        seed_text = self.tokenizer.tokenize(seed_text)
         seed_len = len(seed_text)
-        batch = self.get_init_text(seed_text, max_len, batch_size, method = init_method)
+        batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method)
     
         for ii in range(max_iter):
             inp = torch.tensor(batch).to(self.device)
@@ -125,8 +126,9 @@ class BertTextGenerator:
     def sequential_generation(self, seed_text, batch_size, max_len=15, leed_out_len=15, 
                           top_k=0, temperature=None, sample=True, cuda=False, verbose=True, print_every=10, init_method = "masked"):
         """ Generate one word at a time, in L->R order """
+        seed_text = self.tokenizer.tokenize(seed_text)
         seed_len = len(seed_text)
-        batch = self.get_init_text(seed_text, max_len, batch_size, method = init_method)
+        batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method)
             
         for ii in range(max_len):
             inp = [sent[:seed_len+ii+leed_out_len]+[sep_id] for sent in batch]
