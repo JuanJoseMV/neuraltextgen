@@ -152,9 +152,9 @@ class BertTextGenerator:
                                                             temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=verbose, init_method=init_method)
             elif generation_method == "sequential":
                 batch = self.sequential_generation(seed_text, batch_size=20, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=leed_out_len,
-                                              sample=sample, method= method)
+                                              sample=sample, init_method= init_method)
             elif generation_method == "parallel":
-                batch = self.parallel_generation(seed_text, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, method = method)
+                batch = self.parallel_generation(seed_text, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, init_method = init_method)
 
             if (batch_n + 1) % print_every == 0:
                 print("Finished batch %d in %.3fs" % (batch_n + 1, time.time() - start_time))
