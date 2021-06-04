@@ -131,7 +131,7 @@ class BertTextGenerator:
         batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method)
             
         for ii in range(max_len):
-            inp = [sent[:seed_len+ii+leed_out_len]+[sep_id] for sent in batch]
+            inp = [sent[:seed_len+ii+leed_out_len]+[self.tokenizer.sep_token] for sent in batch]
             inp = torch.tensor(batch).to(self.device)
             out = self.model(inp)['logits']
             idxs = self.generate_step(out, gen_idx=seed_len+ii, top_k=top_k, temperature=temperature, sample=sample)
