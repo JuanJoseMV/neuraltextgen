@@ -114,7 +114,7 @@ class BertTextGenerator:
             inp = torch.tensor(batch).to(self.device)
             out = self.model(inp)['logits']
             for kk in range(max_len):
-                idxs = generate_step(out, gen_idx=seed_len+kk, top_k=top_k, temperature=temperature, sample=sample)
+                idxs = self.generate_step(out, gen_idx=seed_len+kk, top_k=top_k, temperature=temperature, sample=sample)
                 for jj in range(batch_size):
                     batch[jj][seed_len+kk] = idxs[jj]
             
@@ -134,7 +134,7 @@ class BertTextGenerator:
             inp = [sent[:seed_len+ii+leed_out_len]+[sep_id] for sent in batch]
             inp = torch.tensor(batch).to(self.device)
             out = self.model(inp)['logits']
-            idxs = generate_step(out, gen_idx=seed_len+ii, top_k=top_k, temperature=temperature, sample=sample)
+            idxs = self.generate_step(out, gen_idx=seed_len+ii, top_k=top_k, temperature=temperature, sample=sample)
             for jj in range(batch_size):
                 batch[jj][seed_len+ii] = idxs[jj]
 
