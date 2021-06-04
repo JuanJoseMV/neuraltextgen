@@ -110,7 +110,7 @@ class BertTextGenerator:
         batch = get_init_text(seed_text, max_len, batch_size, method = method)
     
         for ii in range(max_iter):
-            inp = torch.tensor(batch).cuda() if cuda else torch.tensor(batch)
+            inp = torch.tensor(batch).to(self.device)
             out = model(inp)
             for kk in range(max_len):
                 idxs = generate_step(out, gen_idx=seed_len+kk, top_k=top_k, temperature=temperature, sample=sample)
@@ -130,7 +130,7 @@ class BertTextGenerator:
             
         for ii in range(max_len):
             inp = [sent[:seed_len+ii+leed_out_len]+[sep_id] for sent in batch]
-            inp = torch.tensor(batch).cuda() if cuda else torch.tensor(batch)
+            inp = torch.tensor(batch).to(self.device)
             out = model(inp)
             idxs = generate_step(out, gen_idx=seed_len+ii, top_k=top_k, temperature=temperature, sample=sample)
             for jj in range(batch_size):
@@ -152,9 +152,9 @@ class BertTextGenerator:
                                                             temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=verbose, init_method=init_method)
             elif generation_method == "sequential":
                 batch = self.sequential_generation(seed_text, batch_size=20, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=leed_out_len,
-                                              sample=sample, cuda = cuda, method= method)
+                                              sample=sample, method= method)
             elif generation_method == "parallel":
-                batch = self.parallel_generation(seed_text, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, cuda = cuda, method = method)
+                batch = self.parallel_generation(seed_text, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, method = method)
 
             if (batch_n + 1) % print_every == 0:
                 print("Finished batch %d in %.3fs" % (batch_n + 1, time.time() - start_time))
