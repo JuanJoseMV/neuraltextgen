@@ -99,7 +99,7 @@ class BertTextGenerator:
                     for_print = self.tokenizer.convert_ids_to_tokens(batch[0])
                     for_print = for_print[:seed_len + kk + 1] + ['(*)'] + for_print[seed_len + kk + 1:]
                     print("iter", ii + 1, " ".join(for_print))
-                    print("iter", ii+1, " ".join(tokenizer.convert_ids_to_tokens(batch[0])))
+                    print("iter", ii+1, " ".join(self.tokenizer.convert_ids_to_tokens(batch[0])))
 
         return untokenize_batch(batch, self.tokenizer)
     
@@ -119,9 +119,9 @@ class BertTextGenerator:
                     batch[jj][seed_len+kk] = idxs[jj]
             
             if verbose and np.mod(ii, print_every) == 0:
-                print("iter", ii+1, " ".join(tokenizer.convert_ids_to_tokens(batch[0])))
+                print("iter", ii+1, " ".join(self.tokenizer.convert_ids_to_tokens(batch[0])))
     
-        return untokenize_batch(batch)
+        return untokenize_batch(batch, self.tokenizer)
             
     def sequential_generation(self, seed_text, batch_size, max_len=15, leed_out_len=15, 
                           top_k=0, temperature=None, sample=True, cuda=False, verbose=True, print_every=10, init_method = "masked"):
@@ -139,9 +139,9 @@ class BertTextGenerator:
                 batch[jj][seed_len+ii] = idxs[jj]
 
             if verbose and np.mod(ii, print_every) == 0:
-                print("iter", ii+1, " ".join(tokenizer.convert_ids_to_tokens(batch[0])))
+                print("iter", ii+1, " ".join(self.tokenizer.convert_ids_to_tokens(batch[0])))
         
-        return untokenize_batch(batch)
+        return untokenize_batch(batch, self.tokenizer)
 
     def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked', generation_method = "parallel sequential", verbose = False):
 
