@@ -103,7 +103,7 @@ class BertTextGenerator:
 
         return untokenize_batch(batch, self.tokenizer)
     
-    def parallel_generation(self, seed_text, max_len=15, top_k=0, temperature=None, max_iter=300, sample=True, 
+    def parallel_generation(self, batch_size, seed_text, max_len=15, top_k=0, temperature=None, max_iter=300, sample=True, 
                         cuda=False, print_every=10, verbose=True, init_method='masked'):
         """ Generate for all positions at a time step """
         seed_len = len(seed_text)
@@ -122,7 +122,7 @@ class BertTextGenerator:
     
         return untokenize_batch(batch)
             
-    def sequential_generation(self, seed_text, batch_size=2, max_len=15, leed_out_len=15, 
+    def sequential_generation(self, seed_text, batch_size, max_len=15, leed_out_len=15, 
                           top_k=0, temperature=None, sample=True, cuda=False, verbose=True, print_every=10, init_method = "masked"):
         """ Generate one word at a time, in L->R order """
         seed_len = len(seed_text)
@@ -151,10 +151,10 @@ class BertTextGenerator:
                 batch = self.parallel_sequential_generation(self.tokenizer.cls_token+seed_text, max_len=max_len, top_k=top_k, batch_size=batch_size, 
                                                             temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=verbose, init_method=init_method)
             elif generation_method == "sequential":
-                batch = self.sequential_generation(seed_text, batch_size=20, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=leed_out_len,
+                batch = self.sequential_generation(seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=leed_out_len,
                                               sample=sample, init_method= init_method)
             elif generation_method == "parallel":
-                batch = self.parallel_generation(seed_text, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, init_method = init_method)
+                batch = self.parallel_generation(seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, init_method = init_method)
 
             if (batch_n + 1) % print_every == 0:
                 print("Finished batch %d in %.3fs" % (batch_n + 1, time.time() - start_time))
