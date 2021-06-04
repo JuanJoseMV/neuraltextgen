@@ -69,9 +69,7 @@ class BertTextGenerator:
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_version, do_lower_case= "uncased" in model_version)
 
-
-    def parallel_sequential_generation(self, seed_text, batch_size, max_len=15, top_k=0, temperature=None, max_iter=300, burnin=200,
-                                       cuda=False, print_every=10, verbose=True, init_method='masked'):
+    def parallel_sequential_generation(self, seed_text, batch_size, max_len=15, top_k=0, temperature=None, max_iter=300, burnin=200,sample=True,print_every=10, verbose=True, init_method='masked', masked_prob=0.9):
         """ Generate for one random position at a timestep
         args:
             - burnin: during burn-in period, sample from full distribution; afterwards take argmax
@@ -102,14 +100,15 @@ class BertTextGenerator:
 
         return untokenize_batch(batch, self.tokenizer)
 
-    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked'):
+
+    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked', masked_prob=0.9):
 
         n_batches = math.ceil(n_samples / batch_size)
         start_time = time.time()
 
         for batch_n in range(n_batches):
-            batch = self.parallel_sequential_generation(self.tokenizer.cls_token+seed_text, max_len=max_len, top_k=top_k, batch_size=batch_size,
-                                                   temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=False, init_method=init_method)
+            batch = self.parallel_sequential_generation(self.tokenizer.cls_token+seed_text, max_len=max_len, top_k=top_k, batch_size=batch_size,sample=sample,
+                                                        temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=False, init_method=init_method,masked_prob=masked_prob)
 
             if (batch_n + 1) % print_every == 0:
                 print("Finished batch %d in %.3fs" % (batch_n + 1, time.time() - start_time))
@@ -142,7 +141,6 @@ class BertTextGenerator:
 
 
         return tokenize_batch(batch, self.tokenizer)
-
 
     def generate_step(self, out, gen_idx, temperature=None, top_k=0, sample=False, return_list=True):
         """ Generate a word from from out[gen_idx]
@@ -221,9 +219,12 @@ if __name__ == '__main__':
     it_target = "curva"
     it_bert_model.predict_masked(it_text, target=it_target)
 
+    import time
+
+    i = time.time()
 
     # text generation
-    parameters = {'n_samples': 10,  # 1000
+    parameters = {'n_samples': 5,  # 1000
                   'batch_size': 5,  # 50
                   'max_len': 15,
                   'top_k': 100,
@@ -232,7 +233,8 @@ if __name__ == '__main__':
                   'sample': True,
                   'max_iter': 100,
                   'seed_text': "",
-                  'init_method':'random'
+                  'init_method':'mixed',
+                  'masked_prob':0.95
                   }
 
     # "key1=val1_key2=val2_...txt"
@@ -245,10 +247,12 @@ if __name__ == '__main__':
         print(f"\t{sent}")
 
 
-    print('\n\n ITALIAN TEXT GENERATION')
-    it_bert_sents = it_bert_model.generate(**parameters)
-    print("\nItalian text generated: ")
-    for sent in it_bert_sents:
-        print(f"\t{sent}")
+    # print('\n\n ITALIAN TEXT GENERATION')
+    # it_bert_sents = it_bert_model.generate(**parameters)
+    # print("\nItalian text generated: ")
+    # for sent in it_bert_sents:
+    #     print(f"\t{sent}")
 
 
+
+    print(f"Required: {time.time() - i}s")
