@@ -153,7 +153,7 @@ class BertTextGenerator:
                 batch = self.parallel_sequential_generation(self.tokenizer.cls_token+seed_text, max_len=max_len, top_k=top_k, batch_size=batch_size, 
                                                             temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=verbose, init_method=init_method)
             elif generation_method == "sequential":
-                batch = self.sequential_generation(self.tokenizer.cls_token+seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=leed_out_len,
+                batch = self.sequential_generation(self.tokenizer.cls_token+seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=15,
                                               sample=sample, init_method= init_method)
             elif generation_method == "parallel":
                 batch = self.parallel_generation(self.tokenizer.cls_token+seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, init_method = init_method)
