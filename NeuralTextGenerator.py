@@ -1,4 +1,5 @@
 import math
+import random
 import time
 import torch
 import numpy as np
@@ -94,10 +95,7 @@ class BertTextGenerator:
                     batch[jj][seed_len + kk] = idxs[jj]
 
                 if verbose and np.mod(ii + 1, print_every) == 0:
-                    for_print = self.tokenizer.convert_ids_to_tokens(batch[0])
-                    for_print = for_print[:seed_len + kk + 1] + ['(*)'] + for_print[seed_len + kk + 1:]
-                    print("iter", ii + 1, " ".join(for_print))
-                    print("iter", ii+1, " ".join(self.tokenizer.convert_ids_to_tokens(batch[0])))
+                    print("iter", ii+1, detokenize(self.tokenizer.convert_ids_to_tokens(batch[0]), self.tokenizer))
 
         return untokenize_batch(batch, self.tokenizer)
     
@@ -117,32 +115,58 @@ class BertTextGenerator:
                     batch[jj][seed_len+kk] = idxs[jj]
             
             if verbose and np.mod(ii, print_every) == 0:
-                print("iter", ii+1, " ".join(self.tokenizer.convert_ids_to_tokens(batch[0])))
+                print("iter", ii+1, detokenize(self.tokenizer.convert_ids_to_tokens(batch[0]), self.tokenizer))
     
         return untokenize_batch(batch, self.tokenizer)
             
     def sequential_generation(self, seed_text, batch_size, max_len=15, leed_out_len=15, 
-                          top_k=0, temperature=None, max_iter=300, sample=True, cuda=False, verbose=True, print_every=10, init_method = "masked"):
+                          top_k=0, temperature=None, sample=True, cuda=False, verbose=True, print_every=10, init_method = "masked"):
         """ Generate one word at a time, in L->R order """
         seed_text = self.tokenizer.tokenize(seed_text)
         seed_len = len(seed_text)
         batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method)
 
-        for kk in range(max_iter):
-            for ii in range(max_len):
-                inp = [sent[:seed_len+ii+leed_out_len]+[self.tokenizer.sep_token] for sent in batch]
-                inp = torch.tensor(batch).to(self.device)
-                out = self.model(inp)['logits']
-                idxs = self.generate_step(out, gen_idx=seed_len+ii, top_k=top_k, temperature=temperature, sample=sample)
-                for jj in range(batch_size):
-                    batch[jj][seed_len+ii] = idxs[jj]
+        for ii in range(max_len):
+            inp = [sent[:seed_len+ii+leed_out_len]+[self.tokenizer.sep_token] for sent in batch]
+            inp = torch.tensor(batch).to(self.device)
+            out = self.model(inp)['logits']
+            idxs = self.generate_step(out, gen_idx=seed_len+ii, top_k=top_k, temperature=temperature, sample=sample)
+            for jj in range(batch_size):
+                batch[jj][seed_len+ii] = idxs[jj]
 
-            if verbose and np.mod(jj, print_every) == 0:
-                print("iter", jj+1, " ".join(self.tokenizer.convert_ids_to_tokens(batch[0])))
+        if verbose:
+            print(detokenize(self.tokenizer.convert_ids_to_tokens(batch[0]), self.tokenizer))
         
         return untokenize_batch(batch, self.tokenizer)
 
-    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked', generation_method = "parallel sequential", verbose = False):
+    def sequential_random_generation(self, seed_text, batch_size, max_len=15, leed_out_len=15,
+                              top_k=0, temperature=None, sample=True, cuda=False, verbose=True, print_every=10,
+                              init_method="masked", max_iter=300, masked_portion=0.15):
+        """ Generate one word at a time, in L->R order """
+        seed_text = self.tokenizer.tokenize(seed_text)
+        seed_len = len(seed_text)
+        batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method)
+        num_mask = int(max_len * masked_portion)
+        for kk in range(max_iter):
+            for jj in range(batch_size):
+                masked_indexes = np.random.choice(range(1, max_len+1), num_mask, False)
+                for mm in masked_indexes:
+                    batch[jj][mm] = random.randint(0, self.tokenizer.vocab_size)
+
+            for ii in range(max_len):
+                inp = [sent[:seed_len + ii + leed_out_len] + [self.tokenizer.sep_token] for sent in batch]
+                inp = torch.tensor(batch).to(self.device)
+                out = self.model(inp)['logits']
+                idxs = self.generate_step(out, gen_idx=seed_len + ii, top_k=top_k, temperature=temperature, sample=sample)
+                for jj in range(batch_size):
+                    batch[jj][seed_len + ii] = idxs[jj]
+
+        if verbose:
+            print(detokenize(self.tokenizer.convert_ids_to_tokens(batch[0]), self.tokenizer))
+
+        return untokenize_batch(batch, self.tokenizer)
+
+    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True, top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked', generation_method = "parallel sequential", verbose = True):
 
         n_batches = math.ceil(n_samples / batch_size)
         start_time = time.time()
@@ -153,9 +177,13 @@ class BertTextGenerator:
                                                             temperature=temperature, burnin=burnin, max_iter=max_iter, verbose=verbose, init_method=init_method)
             elif generation_method == "sequential":
                 batch = self.sequential_generation(self.tokenizer.cls_token+seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=15,
-                                              sample=sample, init_method= init_method, max_iter=max_iter)
+                                              sample=sample, init_method= init_method)
             elif generation_method == "parallel":
                 batch = self.parallel_generation(self.tokenizer.cls_token+seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, sample=sample, max_iter=max_iter, init_method = init_method)
+            elif generation_method == "sequential random":
+                batch = self.sequential_random_generation(self.tokenizer.cls_token+seed_text, batch_size=batch_size, max_len=max_len, top_k=top_k, temperature=temperature, leed_out_len=15,
+                                              sample=sample, init_method= init_method, max_iter=max_iter, masked_portion=0.15)
+
 
             if (batch_n + 1) % print_every == 0:
                 print("Finished batch %d in %.3fs" % (batch_n + 1, time.time() - start_time))
@@ -279,7 +307,7 @@ if __name__ == '__main__':
                   'max_iter': 100,
                   'seed_text': "",
                   'init_method':'masked',
-                  'generation_method':"sequential"
+                  'generation_method':"sequential random"
                   }
 
     # "key1=val1_key2=val2_...txt"
@@ -292,8 +320,8 @@ if __name__ == '__main__':
         print(f"\t{sent}")
 
 
-    print('\n\n ITALIAN TEXT GENERATION')
-    it_bert_sents = it_bert_model.generate(**parameters)
-    print("\nItalian text generated: ")
-    for sent in it_bert_sents:
-        print(f"\t{sent}")
+    #print('\n\n ITALIAN TEXT GENERATION')
+    #it_bert_sents = it_bert_model.generate(**parameters)
+    #print("\nItalian text generated: ")
+    #for sent in it_bert_sents:
+    #    print(f"\t{sent}")
