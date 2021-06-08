@@ -48,9 +48,8 @@ class BertTextGenerator:
         self.num_attention_masks = len(self.model.base_model.base_model.encoder.layer)
 
     def generate(self, save_to_path=None, n_sentences=100, seed_text="", batch_size=10, max_iter=500, verbose=False,
-                 print_every=50, max_len=40, min_len=4, avg_len=20, std_len=4, mask_prob=1,
-                 generation_method="parallel",
-                 masked_portion=1, temperature=1.0, sample=True, top_k=100, burnin=None):
+                 print_every=50, max_len=40, min_len=4, avg_len=20, std_len=4, init_mask_prob=1,
+                 generation_method="parallel", masked_portion=1, temperature=1.0, sample=True, top_k=100, burnin=None):
         '''
         Principal method of the class, used to generate sentences. The methodology used to generate a batch of sentences
         can be scomposed into 3 main points:
@@ -114,16 +113,16 @@ class BertTextGenerator:
         ------------------------------
         Each batch is initialized as a matrix of tokens of dimension (batch_size x batch_len + 2), where batch_len is
         selected as described above. At the beginning of each sentences is added a cls_token and at the end a sep_token.
-        Each other token is selected based on the value of mask_prob:
+        Each other token is selected based on the value of init_mask_prob:
 
-            - if mask_prob == 1  -> each token is [MASK] with probability 1 (the batch is whole [MASK]s)
+            - if init_mask_prob == 1  -> each token is [MASK] with probability 1 (the batch is whole [MASK]s)
 
-            - if mask_prob == 0  -> each token is selected as a random token in the tokenizer vocabulary (the batch is init as random sentences)
+            - if init_mask_prob == 0  -> each token is selected as a random token in the tokenizer vocabulary (the batch is init as random sentences)
 
-            - if mask_prob in (0, 1) -> each token is sampled as [MASK] with prob mask_prob or with probability
-                                        (1 - mask_prob) as any other token in the tokenizer vocabulary
+            - if init_mask_prob in (0, 1) -> each token is sampled as [MASK] with prob init_mask_prob or with probability
+                                        (1 - init_mask_prob) as any other token in the tokenizer vocabulary
 
-        mask_prob: float in [0,1], default = 1
+        init_mask_prob: float in [0,1], default = 1
             probability of the mask token
 
 
@@ -183,7 +182,7 @@ class BertTextGenerator:
             # Generate and append batch of sentences
 
             sentences += self.generate_batch(seed_text, batch_size, max_iter, verbose=verbose, print_every=print_every,
-                                             sent_len=batch_sentence_len, mask_prob=mask_prob,
+                                             sent_len=batch_sentence_len, init_mask_prob=init_mask_prob,
                                              generation_method=generation_method,
                                              masked_portion=masked_portion, temperature=temperature, sample=sample,
                                              top_k=top_k, burnin=burnin)
@@ -201,14 +200,14 @@ class BertTextGenerator:
 
         return sentences
 
-    def generate_batch(self, seed_text, batch_size, max_iter, verbose, print_every, sent_len, mask_prob,
+    def generate_batch(self, seed_text, batch_size, max_iter, verbose, print_every, sent_len, init_mask_prob,
                        generation_method, masked_portion, temperature, sample, top_k, burnin):
 
         # Init batch
         seed_text = self.tokenizer.tokenize(
             self.tokenizer.cls_token + seed_text)  # add [CLS] token at the beggining of the seed_text
         seed_len = len(seed_text)
-        batch = self.get_init_text(seed_text, sent_len, batch_size, mask_prob)
+        batch = self.get_init_text(seed_text, sent_len, batch_size, init_mask_prob)
 
         # Init sampling parameters
         if generation_method == "parallel":
@@ -255,20 +254,20 @@ class BertTextGenerator:
 
         return self.tokenizer.batch_decode(batch, skip_special_tokens=True)
 
-    def get_init_text(self, seed_text, sent_len, batch_size, mask_prob):
+    def get_init_text(self, seed_text, sent_len, batch_size, init_mask_prob):
         """ Get initial sentence by padding seed_text with either masks or random words to sent_len """
 
         seed_text = self.tokenizer.convert_tokens_to_ids(seed_text)
 
-        if mask_prob == 1:
+        if init_mask_prob == 1:
             batch = [seed_text + [self.tokenizer.mask_token_id] * sent_len + [self.tokenizer.sep_token_id] for _ in
                      range(batch_size)]
-        elif mask_prob == 0:
+        elif init_mask_prob == 0:
             batch = [seed_text + np.random.randint(0, self.tokenizer.vocab_size, sent_len).tolist() + [
                 self.tokenizer.sep_token_id] for _ in range(batch_size)]
         else:
-            p = [(1 - mask_prob) / (self.tokenizer.vocab_size - 1)] * self.tokenizer.vocab_size
-            p[self.tokenizer.mask_token_id] = mask_prob
+            p = [(1 - init_mask_prob) / (self.tokenizer.vocab_size - 1)] * self.tokenizer.vocab_size
+            p[self.tokenizer.mask_token_id] = init_mask_prob
 
             batch = [seed_text + np.random.choice(np.arange(self.tokenizer.vocab_size), sent_len, p=p).tolist() + [
                 self.tokenizer.sep_token_id] for _ in range(batch_size)]
@@ -367,7 +366,7 @@ if __name__ == '__main__':
                   'seed_text': "",
                   'batch_size': 2,  # 50
                   'max_iter': 100,
-                  'mask_prob': 0,
+                  'init_mask_prob': 0,
                   'generation_method': "parallel",
                   'masked_portion': 0.15,
                   'temperature': 1,
