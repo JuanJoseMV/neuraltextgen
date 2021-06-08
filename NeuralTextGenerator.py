@@ -13,200 +13,303 @@ except ModuleNotFoundError:
     APEX_AVAILABLE = False
 
 DEFAULT_DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-CLS = '[CLS]'
-SEP = '[SEP]'
-MASK = '[MASK]'
-
-
-def tokenize_batch(batch, tokenizer):
-    return [tokenizer.convert_tokens_to_ids(sent) for sent in batch]
-
-
-def untokenize_batch(batch, tokenizer):
-    return [tokenizer.convert_ids_to_tokens(sent) for sent in batch]
-
-
-def detokenize(sent, tokenizer):
-    """ Roughly detokenizes (mainly undoes wordpiece) """
-    s = tokenizer.convert_tokens_to_string(sent)
-
-    for tok in [tokenizer.mask_token, tokenizer.cls_token, tokenizer.sep_token]:
-        s = s.replace(tok, '')
-    return s
-
-
-def printer(sent, should_detokenize=True):
-    if should_detokenize:
-        sent = detokenize(sent)[1:-1]
-    print(" ".join(sent))
-
-
-def read_sents(in_file, should_detokenize=False):
-    sents = [sent.strip().split() for sent in open(in_file).readlines()]
-    if should_detokenize:
-        sents = [detokenize(sent) for sent in sents]
-    return sents
-
-
-def write_sents(out_file, sents, should_detokenize=False):
-    with open(out_file, "w") as out_fh:
-        for sent in sents:
-            sent = detokenize(sent[1:-1]) if should_detokenize else sent
-            ###print("%s\n" % " ".join(sent))
-            out_fh.write("%s\n" % " ".join(sent))
 
 
 class BertTextGenerator:
-    def __init__(self, model_version, device=DEFAULT_DEVICE, use_apex=False):
+    def __init__(self, model_version, device=DEFAULT_DEVICE, use_apex=APEX_AVAILABLE):
+        """
+        Wrapper of a BERT model from AutoModelForMaskedLM from huggingfaces.
+        This class implements methods to generate text with the BERT module
+
+        Parameters
+        ----------
+        model_version : str
+            The name of the BERT model to initialize form AutoModelForMaskedLM
+
+        device : str
+            Type of pytorch device to adopt. By default is set to DEFAULT_DEVICE
+            thas is 'cuda' if cuda is available otherwise is 'cpu'
+
+        use_apex : boolean
+            Flag to adopt nvidia apex
+        """
         self.device = device
         self.model_version = model_version
-        self.model = AutoModelForMaskedLM.from_pretrained(model_version)
+        self.model = AutoModelForMaskedLM.from_pretrained(model_version, output_attentions=True)
         self.model.to(self.device)
 
-        if use_apex and APEX_AVAILABLE:
+        if use_apex:
             optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
             self.model, optimizer = amp.initialize(self.model, optimizer, opt_level="O2", keep_batchnorm_fp32=True,
                                                    loss_scale="dynamic")
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_version, do_lower_case="uncased" in model_version)
 
-    def generate(self, save_to_path=None, n_samples=100, seed_text="", batch_size=10, max_len=25, sample=True,
-                 top_k=100, temperature=1.0, burnin=200, max_iter=500, print_every=1, init_method='masked',masked_portion=0.15,
-                 generation_method="parallel sequential", verbose=True):
+        self.num_attention_masks = len(self.model.base_model.base_model.encoder.layer)
+
+    def generate(self, save_to_path=None, n_sentences=100, seed_text="", batch_size=10, max_iter=500, verbose=False,
+                 print_every=50, max_len=40, min_len=4, avg_len=20, std_len=4, mask_prob=1, generation_method="parallel",
+                 masked_portion=1, temperature=1.0, sample=True, top_k=100, burnin=None):
+        '''
+        Principal method of the class, used to generate sentences. The methodology used to generate a batch of sentences
+        can be scomposed into 3 main points:
+
+            1) Initialization: each batch is initialized as a matrix of tokens where each row represent a sentence
+
+            2) Selection: for each iteration and for each sentence one or more tokens are selected and masked
+
+            3) Sampling: for each iteration BERT is used to compute logits of the masked tokens that are then used to sample
+                        new tokens that will replace the masked ones
+
+
+        Parameters
+        ==============================
+
+        (General)
+        ------------------------------
+        save_to_path: str, default = None
+            path of txt file where to store the sentences generated
+
+        n_sentences: int, default = 100
+            total number of sentences to generate
+
+        seed_text: str, default = ""
+            Initial text used to generate the sentences
+
+        batch_size: int, default = 10
+            number of sentences for each batch
+
+        max_iter: int, default = 300
+            number of iterations
+
+        verbose: boolean, default = False
+
+        print_every:int, default = 50
+            print a sample from the batch every print_every iteration.Used only if verbose is True
+
+
+
+
+        (Length of the sentences)
+        ------------------------------
+        The method can generated sentences with different length. For each batch the len of the sentences in it
+        is sampled from a normal distribution N(avg_len, std_len) and then rounded to the closest int.
+        max_len and min_len are used to clip the length
+
+        max_len: int, default = 40
+            maximum length of each sentence
+
+        min_len: int, default = 4
+            minimum length of each sentence
+
+        avg_len: float or int, default = 20
+            average length of the sentences
+
+        std_len: float or int, default = 4
+            standard deviation of the sentences
+
+
+        (Initialization)
+        ------------------------------
+        Each batch is initialized as a matrix of tokens of dimension (batch_size x batch_len + 2), where batch_len is
+        selected as described above. At the beginning of each sentences is added a cls_token and at the end a sep_token.
+        Each other token is selected based on the value of mask_prob:
+
+            - if mask_prob == 1  -> each token is [MASK] with probability 1 (the batch is whole [MASK]s)
+
+            - if mask_prob == 0  -> each token is selected as a random token in the tokenizer vocabulary (the batch is init as random sentences)
+
+            - if mask_prob in (0, 1) -> each token is sampled as [MASK] with prob mask_prob or with probability
+                                        (1 - mask_prob) as any other token in the tokenizer vocabulary
+
+        mask_prob: float in [0,1], default = 1
+            probability of the mask token
+
+
+
+
+        (Selection)
+        ------------------------------
+        generation_method: str, default = "parallel"
+            method used to select the tokens to replace at each iteration
+
+            - 'parallel': for each sentence is selected randomly one token or a percentage of tokens based on the value of masked_portion
+
+            - 'sequential': the tokens are selected sequentially. At iteration i the token in position i % batch_len is selected
+
+            - 'attention': At the first iteration one token is selected randomly for each sentence. In later iterations
+                        for each sentence the token is selected with probabilty distribution based on the attention mask
+                        of the token sampled in the previous iteration
+
+        masked_portion: int or float in [0, 1], default = 1
+            percentage of tokens to mask for each sentence. Used only if generation_method is 'parallel'
+
+
+        (Sampling)
+        ------------------------------
+        temperature: float, default = 1
+            temperature for logits ( logits <- logits/temperature)
+
+        sample: boolean, default = True
+            when sample is True each masked token is replaced sampling randomly according to the corresponding logits
+
+        top_k: int or None, default = 100
+             when top_k > 0  each masked token is replaced sampling randomly according to the logits considering
+             only the top_k tokens. If setted to None all the tokens will be considered
+
+        burnin: int, default = None
+            after burnin iterations the tokens will be chosen determinsitically selecting the one with maximum
+            logit score
+
+
+        Returns
+        -------
+        list
+            a list of sentences (str) already detokenized and cleaned
         '''
 
-        :param save_to_path:
-        :param n_samples:
-        :param seed_text:
-        :param batch_size:
-        :param max_len:
-        :param sample:
-        :param top_k:
-        :param temperature:
-        :param burnin:
-        :param max_iter:
-        :param print_every:
-        :param init_method:
-        :param generation_method:
-        :param verbose:
-        :return:
-        '''
-        n_batches = math.ceil(n_samples / batch_size)
-        start_time = time.time()
+        n_batches = math.ceil(n_sentences / batch_size)
+        
+        if burnin is None:
+            burnin = max_iter
 
         sentences = []
 
         for batch_n in range(n_batches):
-            batch = self.generate_batch(seed_text, batch_size, max_len, top_k, temperature, max_iter,burnin, masked_portion,print_every, verbose, init_method='masked', generation_method=generation_method)
-            sentences += [detokenize(sent, self.tokenizer) for sent in batch]
+            batch_sentence_len = np.round(np.random.normal(avg_len, std_len))
+            batch_sentence_len = int(np.clip(batch_sentence_len, min_len, max_len))
 
-            if (batch_n + 1) % print_every == 0:
+            # Generate and append batch of sentences
+
+            sentences += self.generate_batch(seed_text, batch_size, max_iter, verbose=verbose, print_every=print_every,
+                                             sent_len=batch_sentence_len, mask_prob=mask_prob, generation_method=generation_method,
+                                             masked_portion=masked_portion,temperature=temperature, sample=sample,
+                                             top_k=top_k, burnin=burnin)
+
+            # Print if verbose
+            if verbose and (batch_n + 1) % print_every == 0:
                 print("Finished batch %d in %.3fs" % (batch_n + 1, time.time() - start_time))
                 start_time = time.time()
 
-
+        # Store results
         if save_to_path is not None:
-            with open(save_to_path, 'a') as f:
+            with open(save_to_path, 'w') as f:
                 for sent in sentences:
                     f.write(sent + '\n')
 
         return sentences
 
+    def generate_batch(self, seed_text, batch_size, max_iter, verbose, print_every, sent_len, mask_prob,
+                        generation_method, masked_portion,temperature, sample,top_k, burnin):
 
-    def generate_batch(self, seed_text, batch_size, max_len=15, top_k=0, temperature=None, max_iter=300,
-                       burnin=200, masked_portion=0.15, print_every=50, verbose=True, init_method='masked', generation_method='parallel'):
-        """ Generate for one random position at a timestep
-        args:
-            - burnin: during burn-in period, sample from full distribution; afterwards take argmax
-        """
-
-        seed_text = self.tokenizer.tokenize(seed_text)
+        # Init batch
+        seed_text = self.tokenizer.tokenize(self.tokenizer.cls_token + seed_text)  # add [CLS] token at the beggining of the seed_text
         seed_len = len(seed_text)
-        batch = self.get_init_text(seed_text, max_len, batch_size, method=init_method)
+        batch = self.get_init_text(seed_text, sent_len, batch_size, mask_prob)
 
 
-        num_mask = 1 if generation_method == 'parallel sequential' else int(max_len * masked_portion)
-        p = np.full() if generation_method == 'attention' else None
+        # Init sampling parameters
+        if generation_method == "parallel":
+            if type(masked_portion) is int:
+                num_mask = masked_portion
+            else:
+                num_mask = int(np.round(sent_len * masked_portion))
+            list_probs = None
+        elif generation_method == "sequential":
+            list_probs = None
+            num_mask = 1
+        else:
+            # One probability distribution for each sentence in the batch (initially uniform among all tokens)
+            num_mask = 1
+            list_probs = [np.full(sent_len, 1.0 / sent_len)] * batch_size
 
 
         with torch.no_grad():
             for ii in range(max_iter):
 
-                print(f"ITER [{ii}]")
                 # 1. Select indices to replace
-                idx_to_replace = self.__select_tokens_to_replace(num_mask, max_len,batch_size, ii, seed_len,  p=p, generation_method=generation_method)
-                # print(f'\t indices = {idx_to_replace[0]}')
+                idx_to_replace = self.__select_tokens_to_replace(generation_method, sent_len, batch_size, num_mask, ii,
+                                                                 seed_len, list_probs)
 
                 # 2. Replace with mask
                 self.__replace_tokens(batch, idx_to_replace, tokens=self.tokenizer.mask_token_id)
-                print('\t'+self.tokenizer.decode(batch[0]))
 
                 # 3. Sample new tokens
                 out = self.model(batch)
                 logits = out['logits']
 
                 if generation_method == 'attention':
-                    attentions = out['attentions']
-                    p = self.__generate_probs()
+                    attentions = out['attentions'][0]
+                    list_probs = self.__compute_probs(attentions, batch_size, idx_to_replace)
 
-                # del out
-
-                topk = top_k if (ii >= burnin) else 0
-                idxs = self.generate_step(logits, gen_idx=idx_to_replace, top_k=topk, temperature=temperature, sample=(ii < burnin))
+                sample = False if ii >= burnin else sample
+                idxs = self.generate_step(logits, gen_idx=idx_to_replace,  temperature=temperature, sample=sample, top_k=top_k)
 
                 # 4. Replace tokens
                 self.__replace_tokens(batch, idx_to_replace, tokens=idxs)
-                print('\t'+self.tokenizer.decode(batch[0]))
-                print('\n\n')
 
-                # if verbose and np.mod(ii + 1, print_every) == 0:
-                #     print("iter", ii + 1, detokenize(self.tokenizer.convert_ids_to_tokens(batch[0]), self.tokenizer))
+                if verbose and ii % print_every == 0:
+                    self.__print_batch(batch, 3)
 
-        return untokenize_batch(batch, self.tokenizer)
+        return self.tokenizer.batch_decode(batch, skip_special_tokens=True)
 
 
-    def __select_tokens_to_replace(self, num_mask=None, max_len=None, batch_size=None, ii=None, seed_len=None, p = None, generation_method='parallel sequential'):
-        if generation_method == "sequential":
-            kk = [[ii % max_len] for _ in range(batch_size)]
-        elif generation_method == "attention":
-            kk = np.random.choice(0, max_len, (batch_size, num_mask), p=p)
+    def get_init_text(self, seed_text, sent_len, batch_size, mask_prob):
+        """ Get initial sentence by padding seed_text with either masks or random words to sent_len """
+
+        seed_text = self.tokenizer.convert_tokens_to_ids(seed_text)
+
+        if mask_prob == 1:
+            batch = [seed_text + [self.tokenizer.mask_token_id] * sent_len + [self.tokenizer.sep_token_id] for _ in
+                     range(batch_size)]
+        elif mask_prob == 0:
+            batch = [seed_text + np.random.randint(0, self.tokenizer.vocab_size, sent_len).tolist() + [
+                self.tokenizer.sep_token_id] for _ in range(batch_size)]
         else:
-            kk = np.random.randint(0, max_len, (batch_size, num_mask))
+            p = [(1 - mask_prob) / (self.tokenizer.vocab_size - 1)] * self.tokenizer.vocab_size
+            p[self.tokenizer.mask_token_id] = mask_prob
+
+            batch = [seed_text + np.random.choice(np.arange(self.tokenizer.vocab_size), sent_len, p=p).tolist() + [
+                self.tokenizer.sep_token_id] for _ in range(batch_size)]
+
+        return torch.tensor(batch).to(self.device)
+
+
+    def __select_tokens_to_replace(self, generation_method, sent_len, batch_size, num_mask, ii, seed_len, list_probs):
+        if generation_method == "sequential":
+            kk = [[ii % sent_len] for _ in range(batch_size)]
+        elif generation_method == "attention":
+            kk = [np.random.choice(range(sent_len), num_mask, p=p).tolist() for p in list_probs]
+        else:
+            kk = np.random.randint(0, sent_len, (batch_size, num_mask))
 
         return np.array(kk) + seed_len
-
 
     def __replace_tokens(self, batch, idx_to_replace, tokens):
         rows_idx = np.repeat(range(len(batch)), idx_to_replace.shape[-1]).reshape(idx_to_replace.shape)
 
         if type(tokens) is not int:
             tokens = tokens.reshape(idx_to_replace.shape)
+
         batch[rows_idx, idx_to_replace] = tokens
 
-    def __generate_probs(self):
-        return None
+
+    def __compute_probs(self, attentions, batch_size, idx):
+        ''' compute probabilities from attention masks'''
+        list_probs = []
+
+        # attentions has dimension (batch_size, num_attention_masks, sentence_len, sentence_len)
+        for i in range(batch_size):
+            average_prob = attentions[i,:,idx[i],:].mean(axis=0).flatten().cpu().numpy()
+            average_prob = average_prob[1:-1]   # avoid first ([CLS]) and last token ([SEP])
+            average_prob = average_prob/average_prob.sum() # normalize
+            list_probs.append(average_prob)
+
+        return list_probs
 
 
-    def get_init_text(self, seed_text, max_len, batch_size=1, method='', masked_prob=0.9):
-        """ Get initial sentence by padding seed_text with either masks or random words to max_len """
 
-        seed_text = self.tokenizer.convert_tokens_to_ids([self.tokenizer.cls_token] + seed_text)
-
-        if method == 'masked':
-            batch = [seed_text + [self.tokenizer.mask_token_id] * max_len + [self.tokenizer.sep_token_id] for _ in range(batch_size)]
-        elif method == 'random':
-            batch = [seed_text + np.random.randint(0, self.tokenizer.vocab_size, max_len).tolist() + [self.tokenizer.sep_token_id] for _ in range(batch_size)]
-        elif method == 'mixed':
-            p = [(1 - masked_prob) / (self.tokenizer.vocab_size - 1)] * self.tokenizer.vocab_size
-            p[self.tokenizer.mask_token_id] = masked_prob
-
-            batch = [seed_text + np.random.choice(np.arange(self.tokenizer.vocab_size), max_len, p=p).tolist() + [self.tokenizer.sep_token_id] for _ in range(batch_size)]
-
-
-        return torch.tensor(batch).to(self.device)
-
-
-    def generate_step(self, out, gen_idx, temperature=None, top_k=0, sample=False, return_list=True):
+    def generate_step(self, out, gen_idx, temperature=1, sample=True, top_k=None):
         """ Generate a word from from out[gen_idx]
         args:
             - out (torch.Tensor): tensor of logits of size batch_size x seq_len x vocab_size
@@ -223,97 +326,87 @@ class BertTextGenerator:
 
         if temperature is not None:
             logits = logits / temperature
-        if top_k > 0:
-            kth_vals, kth_idx = logits.topk(top_k, dim=-1)
-            dist = torch.distributions.categorical.Categorical(logits=kth_vals)
-            idx = kth_idx.gather(dim=-1, index=dist.sample().unsqueeze(-1)).squeeze(-1)
-        elif sample:
-            dist = torch.distributions.categorical.Categorical(logits=logits)
-            idx = dist.sample().squeeze(-1)
+
+        if sample:
+            # top_k sampling
+            if top_k is not None:
+                kth_vals, kth_idx = logits.topk(top_k, dim=-1)
+                dist = torch.distributions.categorical.Categorical(logits=kth_vals)
+                idx = kth_idx.gather(dim=-1, index=dist.sample().unsqueeze(-1)).squeeze(-1)
+            # general sampling
+            else:
+                dist = torch.distributions.categorical.Categorical(logits=logits)
+                idx = dist.sample().squeeze(-1)
+        # burnin - deterministic
         else:
             idx = torch.argmax(logits, dim=-1)
 
         return idx
 
-    def predict_masked(self, text, target=None):
-        tokenized_text = self.tokenizer.tokenize(text)
-        # tokenized_text = self.tokenizer.encode(text)
 
-        if target is not None:
-            masked_index = tokenized_text.index(self.tokenizer.tokenize(target)[0])
-            tokenized_text[masked_index] = self.tokenizer.mask_token
 
-        indexed_tokens = self.tokenizer.convert_tokens_to_ids(tokenized_text)
+    def __print_batch(self, batch, n, header=None):
+        '''
+        print a batch of tokens. Used mainly for debugging
 
-        segments_ids = [1] * len(tokenized_text)
-        for i in range(len(segments_ids)):
-            segments_ids[i] = 0
-            if tokenized_text[i] == self.tokenizer.sep_token:
-                break
-        segments_ids
+        Parameters
+        ------------
+        n : int
+            number of sentences to print from the batch
 
-        tokens_tensor = torch.tensor([indexed_tokens]).to(self.device)
-        segments_tensors = torch.tensor([segments_ids]).to(self.device)
+        header : str
+            header of the batch printed before the sentences
+        '''
+        if header is not None:
+            print(f'=== {header} ===')
 
-        with torch.no_grad():
-            out = self.model(tokens_tensor, segments_tensors)['logits']
+        print(self.tokenizer.batch_decode(batch[:n], skip_special_tokens=True))
 
-            predicted_index = torch.argmax(out[0, masked_index]).item()
-            predicted_token = self.tokenizer.convert_ids_to_tokens([predicted_index])
+        print('...\n')
 
-            print("\n\nOriginal:", text)
-            print("Masked:", " ".join(tokenized_text))
 
-            print("Predicted token:", predicted_token)
-            print("Other options:")
-            # just curious about what the next few options look like.
-            for i in range(10):
-                out[0, masked_index, predicted_index] = -11100000
-                predicted_index = torch.argmax(out[0, masked_index]).item()
-                predicted_token = self.tokenizer.convert_ids_to_tokens([predicted_index])
-                print(predicted_token)
 
 
 if __name__ == '__main__':
 
     # model initialization
     en_bert_model = BertTextGenerator('bert-base-uncased')
-    it_bert_model = BertTextGenerator("Musixmatch/umberto-wikipedia-uncased-v1")
+    # it_bert_model = BertTextGenerator("Musixmatch/umberto-wikipedia-uncased-v1")
 
     # masked prediction
-    en_text = "He was sitting. [SEP] although he had already eaten a large meal, he was still very hungry."
-    en_target = "meal"
-    en_bert_model.predict_masked(en_text, target=en_target)
+    # en_text = f"He was sitting. [SEP] although he had already eaten a large meal, he was still very hungry. {en_bert_model.tokenizer.pad_token} {en_bert_model.tokenizer.mask_token}" +f"{en_bert_model.tokenizer.pad_token} " * 3
+    # en_target = "meal"
+    # en_bert_model.predict_masked(en_text, target=None)
 
-    it_text = 'In geometria, la curva di Peano è una curva che "ricopre" interamente un quadrato. [SEP] È stata la prima curva con questa proprietà ad essere scoperta da Giuseppe Peano nel 1890'
-    it_target = "curva"
-    it_bert_model.predict_masked(it_text, target=it_target)
+    # it_text = 'In geometria, la curva di Peano è una curva che "ricopre" interamente un quadrato. [SEP] È stata la prima curva con questa proprietà ad essere scoperta da Giuseppe Peano nel 1890'
+    # it_target = "curva"
+    # it_bert_model.predict_masked(it_text, target=it_target)
 
     # text generation
-    parameters = {'n_samples': 10,  # 1000
-                  'batch_size': 5,  # 50
-                  'max_len': 15,
-                  'top_k': 100,
-                  'temperature': 1,
-                  'burnin': 100,
-                  'sample': True,
-                  'max_iter': 100,
+    parameters = {'n_sentences': 4,  # 1000
                   'seed_text': "",
-                  'init_method': 'masked',
-                  'generation_method': "sequential"
+                  'batch_size': 2,  # 50
+                  'max_iter': 100,
+                  'mask_prob': 0,
+                  'generation_method': "parallel",
+                  'masked_portion': 0.15,
+                  'temperature': 1,
+                  'sample': True,
+                  'top_k': 100,
+                  'burnin': 1,
                   }
-
-    # "key1=val1_key2=val2_...txt"
-    # file_path = "_".join([f"{k}={v}" for k, v in parameters.items()])+".txt"
+    #
+    # # "key1=val1_key2=val2_...txt"
+    # # file_path = "_".join([f"{k}={v}" for k, v in parameters.items()])+".txt"
     file_path = None
     print('\n\n ENGLISH TEXT GENERATION')
     en_bert_sents = en_bert_model.generate(save_to_path=file_path, **parameters)
     print("\nEnglish text generated: ")
     for sent in en_bert_sents:
         print(f"\t{sent}")
-
-    # print('\n\n ITALIAN TEXT GENERATION')
-    # it_bert_sents = it_bert_model.generate(**parameters)
-    # print("\nItalian text generated: ")
-    # for sent in it_bert_sents:
-    #    print(f"\t{sent}")
+    #
+    # # print('\n\n ITALIAN TEXT GENERATION')
+    # # it_bert_sents = it_bert_model.generate(**parameters)
+    # # print("\nItalian text generated: ")
+    # # for sent in it_bert_sents:
+    # #    print(f"\t{sent}")
