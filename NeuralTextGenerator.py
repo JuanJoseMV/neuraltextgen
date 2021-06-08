@@ -48,7 +48,8 @@ class BertTextGenerator:
         self.num_attention_masks = len(self.model.base_model.base_model.encoder.layer)
 
     def generate(self, save_to_path=None, n_sentences=100, seed_text="", batch_size=10, max_iter=500, verbose=False,
-                 print_every=50, max_len=40, min_len=4, avg_len=20, std_len=4, mask_prob=1, generation_method="parallel",
+                 print_every=50, max_len=40, min_len=4, avg_len=20, std_len=4, mask_prob=1,
+                 generation_method="parallel",
                  masked_portion=1, temperature=1.0, sample=True, top_k=100, burnin=None):
         '''
         Principal method of the class, used to generate sentences. The methodology used to generate a batch of sentences
@@ -169,7 +170,7 @@ class BertTextGenerator:
         '''
 
         n_batches = math.ceil(n_sentences / batch_size)
-        
+
         if burnin is None:
             burnin = max_iter
 
@@ -182,8 +183,9 @@ class BertTextGenerator:
             # Generate and append batch of sentences
 
             sentences += self.generate_batch(seed_text, batch_size, max_iter, verbose=verbose, print_every=print_every,
-                                             sent_len=batch_sentence_len, mask_prob=mask_prob, generation_method=generation_method,
-                                             masked_portion=masked_portion,temperature=temperature, sample=sample,
+                                             sent_len=batch_sentence_len, mask_prob=mask_prob,
+                                             generation_method=generation_method,
+                                             masked_portion=masked_portion, temperature=temperature, sample=sample,
                                              top_k=top_k, burnin=burnin)
 
             # Print if verbose
@@ -200,13 +202,13 @@ class BertTextGenerator:
         return sentences
 
     def generate_batch(self, seed_text, batch_size, max_iter, verbose, print_every, sent_len, mask_prob,
-                        generation_method, masked_portion,temperature, sample,top_k, burnin):
+                       generation_method, masked_portion, temperature, sample, top_k, burnin):
 
         # Init batch
-        seed_text = self.tokenizer.tokenize(self.tokenizer.cls_token + seed_text)  # add [CLS] token at the beggining of the seed_text
+        seed_text = self.tokenizer.tokenize(
+            self.tokenizer.cls_token + seed_text)  # add [CLS] token at the beggining of the seed_text
         seed_len = len(seed_text)
         batch = self.get_init_text(seed_text, sent_len, batch_size, mask_prob)
-
 
         # Init sampling parameters
         if generation_method == "parallel":
@@ -222,7 +224,6 @@ class BertTextGenerator:
             # One probability distribution for each sentence in the batch (initially uniform among all tokens)
             num_mask = 1
             list_probs = [np.full(sent_len, 1.0 / sent_len)] * batch_size
-
 
         with torch.no_grad():
             for ii in range(max_iter):
@@ -243,7 +244,8 @@ class BertTextGenerator:
                     list_probs = self.__compute_probs(attentions, batch_size, idx_to_replace)
 
                 sample = False if ii >= burnin else sample
-                idxs = self.generate_step(logits, gen_idx=idx_to_replace,  temperature=temperature, sample=sample, top_k=top_k)
+                idxs = self.generate_step(logits, gen_idx=idx_to_replace, temperature=temperature, sample=sample,
+                                          top_k=top_k)
 
                 # 4. Replace tokens
                 self.__replace_tokens(batch, idx_to_replace, tokens=idxs)
@@ -252,7 +254,6 @@ class BertTextGenerator:
                     self.__print_batch(batch, 3)
 
         return self.tokenizer.batch_decode(batch, skip_special_tokens=True)
-
 
     def get_init_text(self, seed_text, sent_len, batch_size, mask_prob):
         """ Get initial sentence by padding seed_text with either masks or random words to sent_len """
@@ -274,7 +275,6 @@ class BertTextGenerator:
 
         return torch.tensor(batch).to(self.device)
 
-
     def __select_tokens_to_replace(self, generation_method, sent_len, batch_size, num_mask, ii, seed_len, list_probs):
         if generation_method == "sequential":
             kk = [[ii % sent_len] for _ in range(batch_size)]
@@ -293,21 +293,18 @@ class BertTextGenerator:
 
         batch[rows_idx, idx_to_replace] = tokens
 
-
     def __compute_probs(self, attentions, batch_size, idx):
         ''' compute probabilities from attention masks'''
         list_probs = []
 
         # attentions has dimension (batch_size, num_attention_masks, sentence_len, sentence_len)
         for i in range(batch_size):
-            average_prob = attentions[i,:,idx[i],:].mean(axis=0).flatten().cpu().numpy()
-            average_prob = average_prob[1:-1]   # avoid first ([CLS]) and last token ([SEP])
-            average_prob = average_prob/average_prob.sum() # normalize
+            average_prob = attentions[i, :, idx[i], :].mean(axis=0).flatten().cpu().numpy()
+            average_prob = average_prob[1:-1]  # avoid first ([CLS]) and last token ([SEP])
+            average_prob = average_prob / average_prob.sum()  # normalize
             list_probs.append(average_prob)
 
         return list_probs
-
-
 
     def generate_step(self, out, gen_idx, temperature=1, sample=True, top_k=None):
         """ Generate a word from from out[gen_idx]
@@ -343,8 +340,6 @@ class BertTextGenerator:
 
         return idx
 
-
-
     def __print_batch(self, batch, n, header=None):
         '''
         print a batch of tokens. Used mainly for debugging
@@ -357,30 +352,15 @@ class BertTextGenerator:
         header : str
             header of the batch printed before the sentences
         '''
-        if header is not None:
-            print(f'=== {header} ===')
-
+        print(f'=== {header or "Batch"} ===')
         print(self.tokenizer.batch_decode(batch[:n], skip_special_tokens=True))
-
         print('...\n')
-
-
 
 
 if __name__ == '__main__':
 
     # model initialization
     en_bert_model = BertTextGenerator('bert-base-uncased')
-    # it_bert_model = BertTextGenerator("Musixmatch/umberto-wikipedia-uncased-v1")
-
-    # masked prediction
-    # en_text = f"He was sitting. [SEP] although he had already eaten a large meal, he was still very hungry. {en_bert_model.tokenizer.pad_token} {en_bert_model.tokenizer.mask_token}" +f"{en_bert_model.tokenizer.pad_token} " * 3
-    # en_target = "meal"
-    # en_bert_model.predict_masked(en_text, target=None)
-
-    # it_text = 'In geometria, la curva di Peano è una curva che "ricopre" interamente un quadrato. [SEP] È stata la prima curva con questa proprietà ad essere scoperta da Giuseppe Peano nel 1890'
-    # it_target = "curva"
-    # it_bert_model.predict_masked(it_text, target=it_target)
 
     # text generation
     parameters = {'n_sentences': 4,  # 1000
@@ -395,18 +375,11 @@ if __name__ == '__main__':
                   'top_k': 100,
                   'burnin': 1,
                   }
-    #
-    # # "key1=val1_key2=val2_...txt"
-    # # file_path = "_".join([f"{k}={v}" for k, v in parameters.items()])+".txt"
+
     file_path = None
     print('\n\n ENGLISH TEXT GENERATION')
     en_bert_sents = en_bert_model.generate(save_to_path=file_path, **parameters)
     print("\nEnglish text generated: ")
     for sent in en_bert_sents:
         print(f"\t{sent}")
-    #
-    # # print('\n\n ITALIAN TEXT GENERATION')
-    # # it_bert_sents = it_bert_model.generate(**parameters)
-    # # print("\nItalian text generated: ")
-    # # for sent in it_bert_sents:
-    # #    print(f"\t{sent}")
+
