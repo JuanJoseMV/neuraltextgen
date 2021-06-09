@@ -240,7 +240,7 @@ class BertTextGenerator:
 
                 if generation_method == 'attention':
                     attentions = out['attentions'][0]
-                    list_probs = self.__compute_probs(attentions, batch_size, idx_to_replace)
+                    list_probs = self.__compute_probs(attentions, batch_size, idx_to_replace, seed_len)
 
                 sample = False if ii >= burnin else sample
                 idxs = self.generate_step(logits, gen_idx=idx_to_replace, temperature=temperature, sample=sample,
@@ -292,14 +292,14 @@ class BertTextGenerator:
 
         batch[rows_idx, idx_to_replace] = tokens
 
-    def __compute_probs(self, attentions, batch_size, idx):
+    def __compute_probs(self, attentions, batch_size, idx, seed_len):
         ''' compute probabilities from attention masks'''
         list_probs = []
 
         # attentions has dimension (batch_size, num_attention_masks, sentence_len, sentence_len)
         for i in range(batch_size):
             average_prob = attentions[i, :, idx[i], :].mean(axis=0).flatten().cpu().numpy()
-            average_prob = average_prob[1:-1]  # avoid first ([CLS]) and last token ([SEP])
+            average_prob = average_prob[seed_len:-1]  # avoid seed_text and last token ([SEP])
             average_prob = average_prob / average_prob.sum()  # normalize
             list_probs.append(average_prob)
 
@@ -362,17 +362,16 @@ if __name__ == '__main__':
     en_bert_model = BertTextGenerator('bert-base-uncased')
 
     # text generation
-    parameters = {'n_sentences': 4,  # 1000
-                  'seed_text': "",
-                  'batch_size': 2,  # 50
+    parameters = {'n_sentences': 10,  # 1000
+                  'seed_text': "i want",
+                  'batch_size': 10,  # 50
                   'max_iter': 100,
-                  'init_mask_prob': 0,
-                  'generation_method': "parallel",
+                  'init_mask_prob': 1,
+                  'generation_method': "attention",
                   'masked_portion': 0.15,
-                  'temperature': 1,
+                  'temperature': 0.001,
                   'sample': True,
-                  'top_k': 100,
-                  'burnin': 1,
+                  'top_k': None,
                   }
 
     file_path = None
