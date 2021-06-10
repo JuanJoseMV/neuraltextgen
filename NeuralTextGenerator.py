@@ -279,8 +279,11 @@ class BertTextGenerator:
             kk = [[ii % sent_len] for _ in range(batch_size)]
         elif generation_method == "attention":
             kk = [np.random.choice(range(sent_len), num_mask, p=p).tolist() for p in list_probs]
-        else:
+        elif generation_method == 'parallel':
             kk = np.random.randint(0, sent_len, (batch_size, num_mask))
+        elif generation_method == 'parallel original':
+            x = np.random.randint(0, sent_len)
+            kk = [[x] for _ in range(batch_size)]
 
         return np.array(kk) + seed_len
 
