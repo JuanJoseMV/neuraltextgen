@@ -330,7 +330,7 @@ class BertTextGenerator:
 
         if sample:
             # top_k sampling
-            if top_k is > 0:
+            if top_k > 0:
                 kth_vals, kth_idx = logits.topk(top_k, dim=-1)
                 dist = torch.distributions.categorical.Categorical(logits=kth_vals)
                 idx = kth_idx.gather(dim=-1, index=dist.sample().unsqueeze(-1)).squeeze(-1)
