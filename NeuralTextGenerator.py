@@ -279,8 +279,13 @@ class BertTextGenerator:
             kk = [[ii % sent_len] for _ in range(batch_size)]
         elif generation_method == "attention":
             kk = [np.random.choice(range(sent_len), num_mask, p=p).tolist() for p in list_probs]
-        else:
-            kk = np.random.randint(0, sent_len, (batch_size, num_mask))
+        elif generation_method == 'parallel':
+#             kk = np.random.randint(0, sent_len, (batch_size, num_mask))
+            x = np.random.randint(0, sent_len)
+            kk = [[x] for _ in range(batch_size)]
+#         elif generation_method == 'parallel original':
+#             x = np.random.randint(0, sent_len)
+#             kk = [[x] for _ in range(batch_size)]
 
         return np.array(kk) + seed_len
 
@@ -325,7 +330,7 @@ class BertTextGenerator:
 
         if sample:
             # top_k sampling
-            if top_k is not None:
+            if top_k > 0:
                 kth_vals, kth_idx = logits.topk(top_k, dim=-1)
                 dist = torch.distributions.categorical.Categorical(logits=kth_vals)
                 idx = kth_idx.gather(dim=-1, index=dist.sample().unsqueeze(-1)).squeeze(-1)
