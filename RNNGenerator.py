@@ -4,14 +4,16 @@ import numpy as np
 from collections import Counter
 
 class RNNModule(nn.Module):
-    def __init__(self, n_vocab, seq_size, embedding_size, lstm_size):
+    def __init__(self, n_vocab, seq_size, embedding_size, lstm_size, lstm_num_layers=1):
         super(RNNModule, self).__init__()
         self.seq_size = seq_size
         self.lstm_size = lstm_size
+        self.lstm_num_layers = lstm_num_layers
         self.embedding = nn.Embedding(n_vocab, embedding_size)
         self.lstm = nn.LSTM(embedding_size,
                             lstm_size,
-                            batch_first=True)                      
+                            batch_first=True,
+                            num_layers=self.lstm_num_layers)                      
         self.dense = nn.Linear(lstm_size, n_vocab)
 
     def forward(self, x, prev_state):
@@ -22,18 +24,20 @@ class RNNModule(nn.Module):
         return logits, state
 
     def zero_state(self, batch_size):
-        return (torch.zeros(1, batch_size, self.lstm_size),
-                torch.zeros(1, batch_size, self.lstm_size))
+        return (torch.zeros(self.lstm_num_layers, batch_size, self.lstm_size),
+                torch.zeros(self.lstm_num_layers, batch_size, self.lstm_size))
 
 class RNNGenerator():
 
-    def __init__(self, seq_size=32, batch_size=16, embedding_size=64, lstm_size=64, gradients_norm=5, predict_top_k=5, training_epocs=200, lr=0.001):
+    def __init__(self, seq_size=32, batch_size=16, embedding_size=64, lstm_size=64, 
+                 lstm_num_layers=1, gradients_norm=5, predict_top_k=5, training_epocs=200, lr=0.001):
     
     # Hyperparameters
         self.seq_size = seq_size
         self.batch_size = batch_size
         self.embedding_size = embedding_size
         self.lstm_size = lstm_size
+        self.lstm_num_layers = lstm_num_layers
         self.gradients_norm = gradients_norm
         self.predict_top_k = predict_top_k
         self.epochs = training_epocs
@@ -83,7 +87,7 @@ class RNNGenerator():
         return criterion, optimizer
 
 
-    def predict(self, net, device='cpu', n_sentences=100):
+    def predict(self, device, net, n_sentences=100):
         net.eval()
         sentences = []
 
@@ -102,7 +106,7 @@ class RNNGenerator():
 
             words.append(self.int_to_vocab[choice])
 
-            for _ in range(100):
+            for _ in range(n_sentences):
                 ix = torch.tensor([[choice]]).to(device)
                 output, (state_h, state_c) = net(ix, (state_h, state_c))
 
@@ -111,26 +115,26 @@ class RNNGenerator():
                 choice = np.random.choice(choices[0])
                 words.append(self.int_to_vocab[choice])
 
-            generated_sentence = ' '.join(words).encode('utf-8')
+            generated_sentence = ' '.join(words)
             sentences.append(generated_sentence)
 
         return sentences
 
 
-    def train(self, train_file, device='cpu'):
-        epochs = 200
+    def train(self, device, train_file):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         n_vocab, in_text, out_text = self.get_data_from_file(
             train_file, self.batch_size, self.seq_size)
 
         net = RNNModule(n_vocab, self.seq_size,
-                        self.embedding_size, self.lstm_size)
+                        self.embedding_size, self.lstm_size, self.lstm_num_layers)
         net = net.to(device)
 
         criterion, optimizer = self.get_loss_and_train_op(net)
 
         iteration = 0
 
-        for e in range(epochs):
+        for e in range(self.epochs):
             batches = self.get_batches(in_text, out_text, self.batch_size, self.seq_size)
             state_h, state_c = net.zero_state(self.batch_size)
             state_h = state_h.to(device)
@@ -161,7 +165,7 @@ class RNNGenerator():
                 optimizer.step()
 
                 if iteration % 100 == 0:
-                    print('Epoch: {}/{}'.format(e, 200),
+                    print('Epoch: {}/{}'.format(e, self.epochs),
                         'Iteration: {}'.format(iteration),
                         'Loss: {}'.format(loss_value))
         return net
@@ -177,8 +181,8 @@ class RNNGenerator():
 ####### Generation ##########
 
 # file_path = '/content/neuraltextgen/data/wiki103.5k.txt'
-# generator = RNNGenerator()
+# generator = RNNGenerator(training_epocs=300, lstm_num_layers=5, lr=0.01)
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# trained_net = generator.train(file_path, device=device)
+# trained_net = generator.train(device, file_path)
 # # list of sentences
-# sentences = generator.predict(trained_net, device=device, n_sentences=100)
+# sentences = generator.predict(device, trained_net, n_sentences=100)
