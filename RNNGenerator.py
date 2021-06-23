@@ -27,15 +27,14 @@ class RNNModule(nn.Module):
 
 class RNNGenerator():
 
-    def __init__(self, train_file, seq_size=32, batch_size=16, embedding_size=64, lstm_size=64, gradients_norm=5, predict_top_k=5, training_epocs=200, lr=0.001):
+    def __init__(self, seq_size=32, batch_size=16, embedding_size=64, lstm_size=64, gradients_norm=5, predict_top_k=5, training_epocs=200, lr=0.001):
     
     # Hyperparameters
-        self.train_file = train_file,
-        self.seq_size = seq_size,
-        self.batch_size = batch_size,
-        self.embedding_size = embedding_size,
-        self.lstm_size = lstm_size,
-        self.gradients_norm = gradients_norm,
+        self.seq_size = seq_size
+        self.batch_size = batch_size
+        self.embedding_size = embedding_size
+        self.lstm_size = lstm_size
+        self.gradients_norm = gradients_norm
         self.predict_top_k = predict_top_k
         self.epochs = training_epocs
         self.lr = lr
@@ -84,7 +83,7 @@ class RNNGenerator():
         return criterion, optimizer
 
 
-    def predict(self, device, net, n_sentences=100, top_k=5):
+    def predict(self, net, device='cpu', n_sentences=100):
         net.eval()
         sentences = []
 
@@ -97,7 +96,7 @@ class RNNGenerator():
                 ix = torch.tensor([[self.vocab_to_int[w]]]).to(device)
                 output, (state_h, state_c) = net(ix, (state_h, state_c))
 
-            _, top_ix = torch.topk(output[0], k=top_k)
+            _, top_ix = torch.topk(output[0], k=self.predict_top_k)
             choices = top_ix.tolist()
             choice = np.random.choice(choices[0])
 
@@ -107,28 +106,27 @@ class RNNGenerator():
                 ix = torch.tensor([[choice]]).to(device)
                 output, (state_h, state_c) = net(ix, (state_h, state_c))
 
-                _, top_ix = torch.topk(output[0], k=top_k)
+                _, top_ix = torch.topk(output[0], k=self.predict_top_k)
                 choices = top_ix.tolist()
                 choice = np.random.choice(choices[0])
                 words.append(self.int_to_vocab[choice])
 
-        generated_sentence = ' '.join(words).encode('utf-8')
-        sentences.append(generated_sentence)
-        
+            generated_sentence = ' '.join(words).encode('utf-8')
+            sentences.append(generated_sentence)
+
         return sentences
 
 
-    def train(self):
+    def train(self, train_file, device='cpu'):
         epochs = 200
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         n_vocab, in_text, out_text = self.get_data_from_file(
-            self.train_file, self.batch_size, self.seq_size)
+            train_file, self.batch_size, self.seq_size)
 
         net = RNNModule(n_vocab, self.seq_size,
                         self.embedding_size, self.lstm_size)
         net = net.to(device)
 
-        criterion, optimizer = self.get_loss_and_train_op(net, 0.01)
+        criterion, optimizer = self.get_loss_and_train_op(net)
 
         iteration = 0
 
@@ -179,8 +177,8 @@ class RNNGenerator():
 ####### Generation ##########
 
 # file_path = '/content/neuraltextgen/data/wiki103.5k.txt'
-# generator = RNNGenerator(train_file=file_path)
+# generator = RNNGenerator()
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# trained_net = generator.train(device)
-# list of sentences
-# sentences = generator.predict(device, trained_net, ["One"], n_sentences=100, top_k=5)
+# trained_net = generator.train(file_path, device=device)
+# # list of sentences
+# sentences = generator.predict(trained_net, device=device, n_sentences=100)
