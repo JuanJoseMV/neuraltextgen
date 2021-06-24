@@ -1,22 +1,40 @@
+'''
+Code adapted from https://github.com/ChunML/NLP/blob/32a52dc6a252175c60b44389a020fda17a6339b7/text_generation/train_pt.py#L24
+Blog: https://trungtran.io/2019/02/08/text-generation-with-pytorch/
+'''
+
 import torch
 import torch.nn as nn
 import numpy as np
 from collections import Counter
 
 class RNNModule(nn.Module):
-    def __init__(self, n_vocab, seq_size, embedding_size, lstm_size, lstm_num_layers=1):
+    def __init__(self, n_vocab, seq_size, embedding_size, lstm_size, lstm_num_layers=1, lstm_bidirectional=True, lstm_dropout=0, weights=None):
         super(RNNModule, self).__init__()
+
+        # Hyperparameters
         self.seq_size = seq_size
         self.lstm_size = lstm_size
         self.lstm_num_layers = lstm_num_layers
-        self.embedding = nn.Embedding(n_vocab, embedding_size)
-        self.lstm = nn.LSTM(embedding_size,
+        self.lstm_bidirectional = lstm_bidirectional
+        self.embedding_size = weights.shape[1] if weights is not None else embedding_size
+        self.weights = weights
+
+        # Layers configuration
+        ## Embedding layer
+        self.embedding = nn.Embedding.from_pretrained(weights) if weights is not None else nn.Embedding(n_vocab, embedding_size)
+        ## LSTM modules
+        self.lstm = nn.LSTM(self.embedding_size,
                             lstm_size,
                             batch_first=True,
-                            num_layers=self.lstm_num_layers)                      
-        self.dense = nn.Linear(lstm_size, n_vocab)
+                            bidirectional=lstm_bidirectional,
+                            dropout=lstm_dropout,
+                            num_layers=self.lstm_num_layers)      
+        ## Dense layer
+        self.dense = nn.Linear(lstm_size*2 if self.lstm_bidirectional else lstm_size, n_vocab)
 
     def forward(self, x, prev_state):
+        # print(prev_state[0].shape, prev_state[1].shape)
         embed = self.embedding(x)
         output, state = self.lstm(embed, prev_state)
         logits = self.dense(output)
@@ -24,13 +42,16 @@ class RNNModule(nn.Module):
         return logits, state
 
     def zero_state(self, batch_size):
-        return (torch.zeros(self.lstm_num_layers, batch_size, self.lstm_size),
-                torch.zeros(self.lstm_num_layers, batch_size, self.lstm_size))
+        layers = self.lstm_num_layers*2 if self.lstm_bidirectional else self.lstm_num_layers
+
+        return (torch.zeros(layers, batch_size, self.lstm_size),
+                torch.zeros(layers, batch_size, self.lstm_size))
 
 class RNNGenerator():
 
     def __init__(self, seq_size=32, batch_size=16, embedding_size=64, lstm_size=64, 
-                 lstm_num_layers=1, gradients_norm=5, predict_top_k=5, training_epocs=200, lr=0.001):
+                 lstm_num_layers=1, lstm_bidirectional=True, lstm_dropout=0.5, gradients_norm=5, 
+                 predict_top_k=5, training_epocs=200, lr=0.001, weights=None):
     
     # Hyperparameters
         self.seq_size = seq_size
@@ -38,10 +59,13 @@ class RNNGenerator():
         self.embedding_size = embedding_size
         self.lstm_size = lstm_size
         self.lstm_num_layers = lstm_num_layers
+        self.lstm_bidirectional = lstm_bidirectional
+        self.lstm_dropout = lstm_dropout
         self.gradients_norm = gradients_norm
         self.predict_top_k = predict_top_k
         self.epochs = training_epocs
         self.lr = lr
+        self.weights = weights
         self.vocab_to_int = None
         self.int_to_vocab = None
 
@@ -126,8 +150,10 @@ class RNNGenerator():
         n_vocab, in_text, out_text = self.get_data_from_file(
             train_file, self.batch_size, self.seq_size)
 
-        net = RNNModule(n_vocab, self.seq_size,
-                        self.embedding_size, self.lstm_size, self.lstm_num_layers)
+        net = RNNModule(n_vocab=n_vocab, seq_size=self.seq_size, embedding_size=self.embedding_size, 
+                        lstm_size=self.lstm_size, lstm_num_layers=self.lstm_num_layers, 
+                        lstm_bidirectional=self.lstm_bidirectional, lstm_dropout=self.lstm_dropout, weights=self.weights
+                        )
         net = net.to(device)
 
         criterion, optimizer = self.get_loss_and_train_op(net)
@@ -180,8 +206,22 @@ class RNNGenerator():
 
 ####### Generation ##########
 
+## Download pre-trained embeddings
+# ! wget https://dl.fbaipublicfiles.com/fasttext/vectors-english/wiki-news-300d-1M.vec.zip
+# ! unzip '/content/wiki-news-300d-1M.vec.zip'
+# import gensim.models.wrappers.fasttext
+# model = gensim.models.KeyedVectors.load_word2vec_format('/content/wiki-news-300d-1M.vec')
+# word_vectors = model.wv
+
+# import torch
+# import torch.nn as nn
+
+# weights = torch.FloatTensor(word_vectors.vectors)
+# embedding = nn.Embedding.from_pretrained(weights)
+
+
 # file_path = '/content/neuraltextgen/data/wiki103.5k.txt'
-# generator = RNNGenerator(training_epocs=300, lstm_num_layers=5, lr=0.01)
+# generator = RNNGenerator(training_epocs=200, lstm_num_layers=10, lr=0.1, lstm_bidirectional=True)
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # trained_net = generator.train(device, file_path)
 # # list of sentences
