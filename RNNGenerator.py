@@ -18,7 +18,6 @@ class RNNModule(nn.Module):
         self.lstm_num_layers = lstm_num_layers
         self.lstm_bidirectional = lstm_bidirectional
         self.embedding_size = weights.shape[1] if weights is not None else embedding_size
-        self.weights = weights
 
         # Layers configuration
         ## Embedding layer
@@ -49,11 +48,12 @@ class RNNModule(nn.Module):
 
 class RNNGenerator():
 
-    def __init__(self, seq_size=32, batch_size=16, embedding_size=64, lstm_size=64, 
+    def __init__(self, max_len=100, seq_size=32, batch_size=16, embedding_size=64, lstm_size=64, 
                  lstm_num_layers=1, lstm_bidirectional=True, lstm_dropout=0.5, gradients_norm=5, 
                  predict_top_k=5, training_epocs=200, lr=0.001, weights=None):
     
     # Hyperparameters
+        self.max_len = max_len
         self.seq_size = seq_size
         self.batch_size = batch_size
         self.embedding_size = embedding_size
@@ -73,7 +73,7 @@ class RNNGenerator():
         with open(train_file, 'r', encoding='utf-8') as f:
             text = f.read()
         text = text.split()
-        text = text[:int(len(text) * 0.1)]
+        #text = text[:int(len(text) * 0.1)]
 
         word_counts = Counter(text)
         sorted_vocab = sorted(word_counts, key=word_counts.get, reverse=True)
@@ -116,6 +116,7 @@ class RNNGenerator():
         sentences = []
 
         for _ in range(n_sentences):
+            rand_seq = np.random.randint(1,self.max_len)
             words = np.random.choice(list(self.int_to_vocab.values()), np.random.randint(1, 3)).tolist()
             state_h, state_c = net.zero_state(1)
             state_h = state_h.to(device)
@@ -129,8 +130,10 @@ class RNNGenerator():
             choice = np.random.choice(choices[0])
 
             words.append(self.int_to_vocab[choice])
+            num_generated_words = rand_seq - len(words)
+            print(num_generated_words)
 
-            for _ in range(n_sentences):
+            for _ in range(num_generated_words):
                 ix = torch.tensor([[choice]]).to(device)
                 output, (state_h, state_c) = net(ix, (state_h, state_c))
 
@@ -146,7 +149,7 @@ class RNNGenerator():
 
 
     def train(self, device, train_file):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         n_vocab, in_text, out_text = self.get_data_from_file(
             train_file, self.batch_size, self.seq_size)
 
@@ -221,7 +224,7 @@ class RNNGenerator():
 
 
 # file_path = '/content/neuraltextgen/data/wiki103.5k.txt'
-# generator = RNNGenerator(training_epocs=200, lstm_num_layers=10, lr=0.1, lstm_bidirectional=True)
+# generator = RNNGenerator(training_epocs=1, lstm_num_layers=10, lr=0.1, lstm_bidirectional=True)
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # trained_net = generator.train(device, file_path)
 # # list of sentences
