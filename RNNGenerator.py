@@ -73,7 +73,6 @@ class RNNGenerator():
         with open(train_file, 'r', encoding='utf-8') as f:
             text = f.read()
         text = text.split()
-        #text = text[:int(len(text) * 0.1)]
 
         word_counts = Counter(text)
         sorted_vocab = sorted(word_counts, key=word_counts.get, reverse=True)
@@ -149,7 +148,6 @@ class RNNGenerator():
 
 
     def train(self, device, train_file):
-        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         n_vocab, in_text, out_text = self.get_data_from_file(
             train_file, self.batch_size, self.seq_size)
 
