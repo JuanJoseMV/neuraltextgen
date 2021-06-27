@@ -8,6 +8,13 @@ import torch.nn as nn
 import numpy as np
 from collections import Counter
 
+try:
+    from apex import amp
+
+    APEX_AVAILABLE = True
+except ModuleNotFoundError:
+    APEX_AVAILABLE = False
+
 class RNNModule(nn.Module):
     def __init__(self, n_vocab, seq_size, embedding_size, lstm_size, lstm_num_layers=1, lstm_bidirectional=True, lstm_dropout=0, weights=None):
         super(RNNModule, self).__init__()
@@ -159,6 +166,9 @@ class RNNGenerator():
 
         criterion, optimizer = self.get_loss_and_train_op(net)
 
+        if APEX_AVAILABLE:
+            net, optimizer = amp.initialize(net, optimizer, opt_level="O2", keep_batchnorm_fp32=True,
+                                               loss_scale="dynamic")
         iteration = 0
 
         for e in range(self.epochs):
@@ -181,7 +191,11 @@ class RNNGenerator():
 
                 loss_value = loss.item()
 
-                loss.backward()
+                if APEX_AVAILABLE:
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                else:
+                    loss.backward()
 
                 state_h = state_h.detach()
                 state_c = state_c.detach()
