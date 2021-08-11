@@ -329,15 +329,16 @@ class BertTextGenerator:
             logits = logits / temperature
 
         if sample:
+            # general sampling
+            if top_k is None:
+                dist = torch.distributions.categorical.Categorical(logits=logits)
+                idx = dist.sample().squeeze(-1)
             # top_k sampling
-            if top_k > 0:
+            else:
                 kth_vals, kth_idx = logits.topk(top_k, dim=-1)
                 dist = torch.distributions.categorical.Categorical(logits=kth_vals)
                 idx = kth_idx.gather(dim=-1, index=dist.sample().unsqueeze(-1)).squeeze(-1)
-            # general sampling
-            else:
-                dist = torch.distributions.categorical.Categorical(logits=logits)
-                idx = dist.sample().squeeze(-1)
+
         # burnin - deterministic
         else:
             idx = torch.argmax(logits, dim=-1)
