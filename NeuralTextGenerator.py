@@ -369,7 +369,7 @@ class BertTextGenerator:
         print(self.tokenizer.batch_decode(batch[:n], skip_special_tokens=True))
         print('...\n')
 
-    def finetune(self, sentences, labels, lables_idx, epochs=4, lr=2e-5, batch_size=32):
+    def finetune(self, sentences, labels, labels_idx, epochs=4, lr=2e-5, batch_size=32):
         self.formatter = FormatTokenizer(self.model, self.tokenizer, replace_tokens=['\n'])
         tokens = self.formatter.tokenize(sentences)
 
@@ -407,7 +407,7 @@ class BertTextGenerator:
             t0 = time.time()
             total_train_loss = 0
 
-            model.train()
+            self.model.train()
 
             # iterate through batches
             for step, batch in enumerate(dataloader):
@@ -416,8 +416,8 @@ class BertTextGenerator:
                     elapsed = format_time(time.time() - t0)
                     print('  Batch {:>5,}  of  {:>5,}.    Elapsed: {:}.'.format(step, len(dataloader), elapsed))
 
-                b_input_ids = batch[0].to(device)
-                b_input_mask = batch[1].to(device)
+                b_input_ids = batch[0].to(self.device)
+                b_input_mask = batch[1].to(self.device)
                 n_sent, n_tok = b_input_ids.shape
                 n_token_to_mask = int(0.15 * n_tok)
                 # b_labels_idx = torch.tensor([np.random.randint(1, torch.nonzero(b_input_ids[0])[-1].item()-1) for input in b_input_ids])
@@ -427,15 +427,15 @@ class BertTextGenerator:
                 # b_labels = b_input_ids[cA]
 
                 b_input_ids[np.repeat(np.arange(len(b_input_ids)),
-                                      n_token_to_mask), b_labels_idx.flatten()] = tokenizer.mask_token_id
+                                      n_token_to_mask), b_labels_idx.flatten()] = self.tokenizer.mask_token_id
                 # b_input_ids = batch[0].to(device)
                 # b_input_mask = batch[1].to(device)
                 # b_labels = batch[2].to(device)
                 # b_labels_idx = batch[3].to(device)
 
-                model.zero_grad()
+                self.model.zero_grad()
 
-                result = model(b_input_ids, attention_mask=b_input_mask, return_dict=True)
+                result = self.model(b_input_ids, attention_mask=b_input_mask, return_dict=True)
 
                 logits = result['logits']
 
@@ -457,7 +457,7 @@ class BertTextGenerator:
 
                 # Clip the norm of the gradients to 1.0.
                 # This is to help prevent the "exploding gradients" problem.
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
 
                 # Update parameters and take a step using the computed gradient.
                 # The optimizer dictates the "update rule"--how the parameters are
