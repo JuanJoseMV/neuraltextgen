@@ -28,7 +28,7 @@ class FormatTokenizer():
 
     def tokenize(self, lines, labels=None):
         for i in range(len(lines)):
-            for k,j in enumerate(np.linspace(0, len(lines[i]), 3, dtype=int)):
+            for k,j in enumerate(np.linspace(0, len(lines[i]), self.num_tokens_per_class, dtype=int)):
                 lines[i] = lines[i][:min(j, len(lines[i]))] + f' {labels[i]}-{k} ' + lines[i][min(len(lines[i])-1, j):]
 
             for k,v in self.dict_token_replace.items():
