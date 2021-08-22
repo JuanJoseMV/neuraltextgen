@@ -42,14 +42,8 @@ class Formatter():
         return unformatted_sentences
 
 class Encoder():
-    def __init__(self, tokenizer, set_default = True):
-
+    def __init__(self, tokenizer):
         self.tokenizer = tokenizer
-
-        # Setting self reference as default format_tokenizer of the neuraltextgenerator. This is used later on to access
-        # # the tokens to replace back after the generation and the special tokens related to labels in the case of LabelFormatTokenizer
-        # if set_default:
-        #     neuraltextgenerator.format_tokenizer = self
 
 
     def encode(self, lines):
@@ -68,9 +62,9 @@ class Encoder():
 
 
 class LabelEncoder(Encoder):
-    def __init__(self, model, tokenizer, classes=[], num_tokens_per_class=3, **kwargs):
+    def __init__(self, model, tokenizer, classes=[], num_tokens_per_class=3):
 
-        super().__init__(tokenizer, **kwargs)
+        super().__init__(tokenizer)
 
 
         # Preparing special tokens related to labels.
@@ -87,9 +81,5 @@ class LabelEncoder(Encoder):
 
 
     def encode(self, lines, labels):
-        labeled_lines = []
-        if labels is not None:
-            for line, label in zip(lines, labels):
-                labeled_lines.append(' '.join(self.label_special_tokens_dict[label]) + line)  # add tokens at the begininning
-
+        labeled_lines = [' '.join(self.special_tokens[label]) + line for line, label in zip(lines, labels)]
         return super().tokenize(labeled_lines)
