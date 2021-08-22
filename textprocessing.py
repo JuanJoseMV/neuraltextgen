@@ -3,12 +3,16 @@ import numpy as np
 
 
 
+
+
+
+
+
 class Formatter():
 
     def __init__(self, replace_tokens, unused_type='[unusedi]'):
-
-        self.dict_token_replace = {k: unused_type.replace('i', str(i)) for i, k in enumerate(replace_tokens)}
-
+        self.dict_token_replace = {k: ' ' + unused_type.replace('i', str(i + 1)) + ' ' for i, k in
+                                   enumerate(replace_tokens)}
 
     def format(self, path, pattern):
         lines = []
@@ -27,16 +31,15 @@ class Formatter():
         return lines
 
     def unformat(self, sentences):
-
         unformatted_sentences = []
         for sent in sentences:
             # Replace
             for k, v in self.dict_token_replace.items():
-                sent = sent.replace(v, k)
+                sent = sent.replace(v.strip(), k)
 
             unformatted_sentences.append(sent)
 
-        return  unformatted_sentences
+        return unformatted_sentences
 
 class Encoder():
     def __init__(self, tokenizer, set_default = True):
