@@ -1,63 +1,13 @@
 import math
-import random
 import time
 import torch
 import numpy as np
-from transformers import AutoModelForMaskedLM, AutoTokenizer, AutoModel, BertConfig, AutoConfig
-
-try:
-    from apex import amp
-
-    APEX_AVAILABLE = True
-except ModuleNotFoundError:
-    APEX_AVAILABLE = False
-
-DEFAULT_DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-
-class FormatTokenizer():
-    def __init__(self, model, tokenizer, pattern=None, replace_tokens=[], classes=[], num_tokens_per_class=0):
-        self.tokenizer = tokenizer
-        self.num_tokens_per_class = num_tokens_per_class
-        # self.pattern_re = re.compile(pattern)
-
-        self.dict_token_replace = {k: f'unused{i}' for i, k in enumerate(replace_tokens)}
-
-        special_tokens_dict = {'additional_special_tokens': [f'{c}-{i}' for c in classes for i in range(num_tokens_per_class)]}
-        model.resize_token_embeddings(len(tokenizer))
-
-    def tokenize(self, lines, labels=None):
-        for i in range(len(lines)):
-            for k,j in enumerate(np.linspace(0, len(lines[i]), self.num_tokens_per_class, dtype=int)):
-                lines[i] = lines[i][:min(j, len(lines[i]))] + f' {labels[i]}-{k} ' + lines[i][min(len(lines[i])-1, j):]
-
-            for k,v in self.dict_token_replace.items():
-                lines[i] = lines[i].replace(k,f' {v} ')
-                print(lines[i])
-
-        encoded_dict = self.tokenizer.batch_encode_plus(
-            lines,  # Sentence to encode.
-            padding=True,
-            add_special_tokens=True,  # Add '[CLS]' and '[SEP]'
-            return_attention_mask=True,  # Construct attn. masks.
-            return_tensors='pt',  # Return pytorch tensors.
-        )
-
-        # for k, j in enumerate(np.linspace(1, len(tokens), self.num_tokens_per_class, dtype=int)):
-        #     tokens.insert(j, self.tokenizer.vocab[f'{labels[i]}-{k}'])
-
-        return encoded_dict
-
-
-import math
-import random
-
-import time
-import torch
-import numpy as np
-from transformers import AutoModelForMaskedLM, AutoTokenizer, AutoModel, BertConfig, AutoConfig
-from torch.utils.data import TensorDataset, random_split
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+from transformers import AutoModelForMaskedLM, AutoTokenizer
+from torch.utils.data import TensorDataset, DataLoader, RandomSampler
+from transformers import AdamW, get_linear_schedule_with_warmup
+import torch.nn.functional as F
+from textprocessing import *
+from utils import *
 
 try:
     from apex import amp
@@ -70,7 +20,8 @@ DEFAULT_DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 class BertTextGenerator:
-    def __init__(self, model_version, device=DEFAULT_DEVICE, use_apex=APEX_AVAILABLE):
+    def __init__(self, model_version, device=DEFAULT_DEVICE, use_apex=APEX_AVAILABLE, use_fast=True,
+                 do_basic_tokenize=True):
         """
         Wrapper of a BERT model from AutoModelForMaskedLM from huggingfaces.
         This class implements methods to generate text with the BERT module
@@ -80,7 +31,7 @@ class BertTextGenerator:
             The name of the BERT model to initialize form AutoModelForMaskedLM
         device : str
             Type of pytorch device to adopt. By default is set to DEFAULT_DEVICE
-            thas is 'cuda' if cuda is available otherwise is 'cpu'
+            that is 'cuda' if cuda is available otherwise is 'cpu'
         use_apex : boolean
             Flag to adopt nvidia apex
         """
@@ -88,22 +39,26 @@ class BertTextGenerator:
         self.model_version = model_version
         self.model = AutoModelForMaskedLM.from_pretrained(model_version, output_attentions=True)
         self.model.to(self.device)
+        self.use_apex = use_apex
 
-        if use_apex:
-            optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
-            self.model, optimizer = amp.initialize(self.model, optimizer, opt_level="O2", keep_batchnorm_fp32=True,
-                                                   loss_scale="dynamic")
+        # Moved to finetune
+        # if use_apex:
+        #     optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
+        #     self.model, optimizer = amp.initialize(self.model, optimizer, opt_level="O2", keep_batchnorm_fp32=True,
+        #                                            loss_scale="dynamic")
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_version, do_lower_case="uncased" in model_version)
-
+        self.tokenizer = AutoTokenizer.from_pretrained(model_version, do_lower_case="uncased" in model_version,
+                                                       use_fast=use_fast,
+                                                       do_basic_tokenize=do_basic_tokenize)  # added to avoid splitting of unused tokens
         self.num_attention_masks = len(self.model.base_model.base_model.encoder.layer)
+        self.has_format_tokenizer = False
 
     def generate(self, save_to_path=None, n_sentences=100, seed_text="", batch_size=10, max_iter=500, verbose=False,
                  print_every=50, max_len=40, min_len=4, avg_len=20, std_len=4, init_mask_prob=1,
                  generation_method="parallel", masked_portion=1, temperature=1.0, sample=True, top_k=100, burnin=None):
         '''
         Principal method of the class, used to generate sentences. The methodology used to generate a batch of sentences
-        can be scomposed into 3 main points:
+        can be decomposed into 3 main points:
             1) Initialization: each batch is initialized as a matrix of tokens where each row represent a sentence
             2) Selection: for each iteration and for each sentence one or more tokens are selected and masked
             3) Sampling: for each iteration BERT is used to compute logits of the masked tokens that are then used to sample
@@ -190,7 +145,6 @@ class BertTextGenerator:
             batch_sentence_len = int(np.clip(batch_sentence_len, min_len, max_len))
 
             # Generate and append batch of sentences
-
             sentences += self.generate_batch(seed_text, batch_size, max_iter, verbose=verbose, print_every=print_every,
                                              sent_len=batch_sentence_len, init_mask_prob=init_mask_prob,
                                              generation_method=generation_method,
@@ -249,7 +203,7 @@ class BertTextGenerator:
                 logits = out['logits']
 
                 if generation_method == 'attention':
-                    attentions = out['attentions'][0]
+                    attentions = out['attentions'][-1]
                     list_probs = self.__compute_probs(attentions, batch_size, idx_to_replace, seed_len)
 
                 sample = False if ii >= burnin else sample
@@ -260,7 +214,7 @@ class BertTextGenerator:
                 self.__replace_tokens(batch, idx_to_replace, tokens=idxs)
 
                 if verbose and ii % print_every == 0:
-                    self.__print_batch(batch, 3)
+                    print_batch(self.tokenizer, batch, 3)
 
         return self.tokenizer.batch_decode(batch, skip_special_tokens=True)
 
@@ -355,49 +309,44 @@ class BertTextGenerator:
 
         return idx
 
-    def __print_batch(self, batch, n, header=None):
-        '''
-        print a batch of tokens. Used mainly for debugging
-        Parameters
-        ------------
-        n : int
-            number of sentences to print from the batch
-        header : str
-            header of the batch printed before the sentences
-        '''
-        print(f'=== {header or "Batch"} ===')
-        print(self.tokenizer.batch_decode(batch[:n], skip_special_tokens=True))
-        print('...\n')
+    def finetune(self, sentences, labels=None, mask_percentage=0.15, epochs=4, batch_size=32,
+                 optimizer=AdamW, optimizer_parameters=dict(lr=2e-5, eps=1e-8),
+                 scheduler=get_linear_schedule_with_warmup, scheduler_parameters=dict(num_warmup_steps=0),
+                 num_tokens_per_class=3
+                 ):
 
-    def finetune(self, sentences, labels, labels_idx, epochs=4, lr=2e-5, batch_size=32):
-        self.formatter = FormatTokenizer(self.model, self.tokenizer, replace_tokens=['\n'])
-        tokens = self.formatter.tokenize(sentences)
+        # set encoder
+        if labels is None:
+            self.encoder = Encoder(self.tokenizer)
+            encoded_dict = self.encoder.encode(sentences)
+        else:
+            classes = np.unique(labels)
+            self.encoder = LabelEncoder(self.model, self.tokenizer, classes=classes,
+                                        num_tokens_per_class=num_tokens_per_class)
+            encoded_dict = self.encoder.encode(sentences, labels)
 
-        dataset = TensorDataset(tokens['input_ids'], tokens['attention_mask'], labels, labels_idx)
+        # Retrieve tokenized sentences and attention masks
+        input_ids = encoded_dict['input_ids']
+        attention_mask = encoded_dict['attention_mask']
 
+        dataset = TensorDataset(input_ids, attention_mask)
         dataloader = DataLoader(dataset, sampler=RandomSampler(dataset), batch_size=batch_size)
 
-        from transformers import BertForSequenceClassification, AdamW, BertConfig
-        from transformers import get_linear_schedule_with_warmup
-        import numpy as np
-
-        optimizer = AdamW(self.model.parameters(),
-                          lr=lr,  # args.learning_rate - default is 5e-5, our notebook had 2e-5
-                          eps=1e-8  # args.adam_epsilon  - default is 1e-8.
-                          )
+        # Setting optimizer and scheduler
+        optimizer = optimizer(self.model.parameters(), **optimizer_parameters)
+        if self.use_apex:
+            self.model, optimizer = amp.initialize(self.model, optimizer, opt_level="O2", keep_batchnorm_fp32=True,
+                                                   loss_scale="dynamic")
 
         total_steps = len(dataloader) * epochs
+        scheduler = scheduler(optimizer, num_training_steps=total_steps, **scheduler_parameters)
 
-        scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                    num_warmup_steps=0,  # Default value in run_glue.py
-                                                    num_training_steps=total_steps)
-
-        # We'll store a number of quantities such as training and validation loss,
-        # validation accuracy, and timings.
+        # TODO add stats
         training_stats = []
-
-        # Measure the total training time for the whole run.
+        test_stats = []
         total_t0 = time.time()
+
+        self.model.train()
 
         for epoch_i in range(0, epochs):
 
@@ -407,70 +356,72 @@ class BertTextGenerator:
             t0 = time.time()
             total_train_loss = 0
 
-            self.model.train()
-
-            # iterate through batches
             for step, batch in enumerate(dataloader):
 
                 if step % 25 == 0 and not step == 0:
                     elapsed = format_time(time.time() - t0)
                     print('  Batch {:>5,}  of  {:>5,}.    Elapsed: {:}.'.format(step, len(dataloader), elapsed))
 
-                b_input_ids = batch[0].to(self.device)
-                b_input_mask = batch[1].to(self.device)
-                n_sent, n_tok = b_input_ids.shape
-                n_token_to_mask = int(0.15 * n_tok)
-                # b_labels_idx = torch.tensor([np.random.randint(1, torch.nonzero(b_input_ids[0])[-1].item()-1) for input in b_input_ids])
+                batch_input = batch[0].to(self.device)
+                batch_attention = batch[1].to(self.device)
 
-                b_labels_idx = torch.randint(1, n_tok, size=(n_sent, n_token_to_mask))
-                b_labels = b_input_ids[np.repeat(np.arange(len(b_input_ids)), n_token_to_mask), b_labels_idx.flatten()]
-                # b_labels = b_input_ids[cA]
+                # 512 to truncate max bert input
+                if len(batch[0]) > 512:
+                    batch_input = batch_input[:, :512]
+                    batch_attention = batch_attention[:, :512]
 
-                b_input_ids[np.repeat(np.arange(len(b_input_ids)),
-                                      n_token_to_mask), b_labels_idx.flatten()] = self.tokenizer.mask_token_id
-                # b_input_ids = batch[0].to(device)
-                # b_input_mask = batch[1].to(device)
-                # b_labels = batch[2].to(device)
-                # b_labels_idx = batch[3].to(device)
+                # Computing number to tokens to mask based on mask_percentage
+                num_sent, num_tokens = batch_input.shape
+                num_tokens_to_mask = int(mask_percentage * num_tokens)
 
+                # Generating randomly num_tokens_to_mask to mask for each sentence, considering only real tokens
+                # (not [CLS] nor label-tokens that are at the beginning of the sentence)
+                start_id = 1 + num_tokens_per_class    # mask only
+                batch_mask_ids = torch.randint(start_id, num_tokens - 1, size=(num_sent, num_tokens_to_mask))
+
+                #  Each sentence needs to be indexed num_tokens_to_mask times.
+                #  This array is of the type [0,0,0 ..., 1,1,1, ..., 2,2,2, ... num_sentences -1]
+                sentence_ids =  np.repeat(np.arange(len(batch_input)), num_tokens_to_mask)
+
+                # Retrieve the original tokens to mask:
+                batch_masked_tokens = batch_input[sentence_ids, batch_mask_ids.flatten()]
+
+                # Mask the tokens
+                batch_input[sentence_ids, batch_mask_ids.flatten()] = self.tokenizer.mask_token_id
+
+
+                # Forward pass
                 self.model.zero_grad()
-
-                result = self.model(b_input_ids, attention_mask=b_input_mask, return_dict=True)
-
+                result = self.model(batch_input, attention_mask=batch_attention, return_dict=True)
                 logits = result['logits']
 
-                # idx = np.concatenate(, 0)
-                logits = logits[np.concatenate([[i] * b_labels_idx.shape[1] for i in range(batch_size)], 0),
-                         b_labels_idx.flatten(), :]
-                # logits = logits[np.arange(len(logits)), b_labels_idx, :]
+                # Retrieve logits only for masked tokens. logits is a tensor of dim [batch_size, num_tokens, len_vocab]
+                # logits = logits[np.concatenate([[i] * batch_mask_ids.shape[1] for i in range(len(batch_mask_ids))], 0),
+                #          batch_mask_ids.flatten(), :]
+                logits = logits[sentence_ids, batch_mask_ids.flatten(), :]
 
-                loss = F.cross_entropy(logits, b_labels.flatten())
 
-                # Accumulate the training loss over all of the batches so that we can
-                # calculate the average loss at the end. `loss` is a Tensor containing a
-                # single value; the `.item()` function just returns the Python value
-                # from the tensor.
+                loss = F.cross_entropy(logits, batch_masked_tokens.flatten())
                 total_train_loss += loss.item()
 
-                # Perform a backward pass to calculate the gradients.
-                loss.backward()
+                # Backward pass
+                if self.use_apex:
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                else:
+                    loss.backward()
 
                 # Clip the norm of the gradients to 1.0.
                 # This is to help prevent the "exploding gradients" problem.
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
 
-                # Update parameters and take a step using the computed gradient.
-                # The optimizer dictates the "update rule"--how the parameters are
-                # modified based on their gradients, the learning rate, etc.
                 optimizer.step()
-
-                # Update the learning rate.
                 scheduler.step()
 
-            # Calculate the average loss over all of the batches.
-            avg_train_loss = total_train_loss / len(dataloader)
+                # Restoring masked tokens
+                batch_input[sentence_ids, batch_mask_ids.flatten()] = batch_masked_tokens.flatten()
 
-            # Measure how long this epoch took.
+            avg_train_loss = total_train_loss / len(dataloader)
             training_time = format_time(time.time() - t0)
 
             print("")
@@ -481,26 +432,6 @@ class BertTextGenerator:
         print("Training complete!")
 
         print("Total training took {:} (h:mm:ss)".format(format_time(time.time() - total_t0)))
-
-
-
-def flat_accuracy(preds, labels):
-    pred_flat = np.argmax(preds, axis=1).flatten()
-    labels_flat = labels.flatten()
-    return np.sum(pred_flat == labels_flat) / len(labels_flat)
-
-
-import time
-import datetime
-import torch.nn.functional as F
-
-
-def format_time(elapsed):
-    '''
-    Takes a time in seconds and returns a string hh:mm:ss
-    '''
-    elapsed_rounded = int(round((elapsed)))
-    return str(datetime.timedelta(seconds=elapsed_rounded))
 
 
 if __name__ == '__main__':
@@ -527,4 +458,3 @@ if __name__ == '__main__':
     print("\nEnglish text generated: ")
     for sent in en_bert_sents:
         print(f"\t{sent}")
-
