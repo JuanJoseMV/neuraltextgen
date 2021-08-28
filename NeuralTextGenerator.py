@@ -187,6 +187,7 @@ class BertTextGenerator:
             # One probability distribution for each sentence in the batch (initially uniform among all tokens)
             num_mask = 1
             list_probs = [np.full(sent_len, 1.0 / sent_len)] * batch_size
+            counter = np.zeros((batch_size, sent_len))
 
         with torch.no_grad():
             for ii in range(max_iter):
@@ -203,8 +204,9 @@ class BertTextGenerator:
                 logits = out['logits']
 
                 if generation_method == 'attention':
-                    attentions = out['attentions'][-1]
-                    list_probs = self.__compute_probs(attentions, batch_size, idx_to_replace, seed_len)
+                    counter[np.arange(batch_size), idx_to_replace.flatten() - seed_len] += 1
+                    attentions = torch.stack(out['attentions'])
+                    list_probs = self.__compute_probs(attentions, batch_size, idx_to_replace, seed_len, counter)
 
                 sample = False if ii >= burnin else sample
                 idxs = self.generate_step(logits, gen_idx=idx_to_replace, temperature=temperature, sample=sample,
@@ -261,18 +263,38 @@ class BertTextGenerator:
 
         batch[rows_idx, idx_to_replace] = tokens
 
-    def __compute_probs(self, attentions, batch_size, idx, seed_len):
+    def __compute_probs(self, attentions, batch_size, idx, seed_len, counter):
         ''' compute probabilities from attention masks'''
-        list_probs = []
+        # list_probs = []
+        #
+        # # attentions has dimension (batch_size, num_attention_masks, sentence_len, sentence_len)
+        # for i in range(batch_size):
+        #     average_prob = attentions[i, :, idx[i], :].mean(axis=0).flatten().cpu().numpy()
+        #     average_prob = average_prob[seed_len:-1]  # avoid seed_text and last token ([SEP])
+        #     average_prob = average_prob / average_prob.sum()  # normalize
+        #     list_probs.append(average_prob)
+        #
+        # return list_probs
 
-        # attentions has dimension (batch_size, num_attention_masks, sentence_len, sentence_len)
-        for i in range(batch_size):
-            average_prob = attentions[i, :, idx[i], :].mean(axis=0).flatten().cpu().numpy()
-            average_prob = average_prob[seed_len:-1]  # avoid seed_text and last token ([SEP])
-            average_prob = average_prob / average_prob.sum()  # normalize
-            list_probs.append(average_prob)
+        avg_attentions = attentions.mean(axis=(0, 2)).cpu().detach().numpy() # mean through encoders and attention masks
+        avg_attentions = avg_attentions[np.arange(batch_size),seed_len:-1,idx.flatten()]  # for each sentence extract the
+                                                                                  # attention corresponding to the
+                                                                                  # masked token (avoiding special tokens and seed)
 
-        return list_probs
+
+        c = counter + 1
+        prob = avg_attentions / c
+
+        return prob / prob.sum(axis=1)[:, np.newaxis]
+    # def counter_penalization(attention, idx_mask, counter, **kwargs):
+    #     a = attention.mean(
+    #         axis=(0, 1)).cpu().detach().numpy()  # mean over ax0 that is encoders and ax1 that is attention_mask
+    #     a = a[1:-1, idx_mask].reshape(-1, 1)
+    #     c = np.array(counter) + 1
+    #     prob = a.flatten() / c
+    #     prob = prob / sum(prob)
+    #     return prob
+
 
     def generate_step(self, out, gen_idx, temperature=1, sample=True, top_k=None):
         """ Generate a word from from out[gen_idx]
@@ -441,15 +463,15 @@ if __name__ == '__main__':
 
     # text generation
     parameters = {'n_sentences': 10,  # 1000
-                  'seed_text': "i want",
+                  'seed_text': "",
                   'batch_size': 10,  # 50
-                  'max_iter': 100,
+                  'max_iter': 150,
                   'init_mask_prob': 1,
                   'generation_method': "attention",
-                  'masked_portion': 0.15,
-                  'temperature': 0.001,
+                  'masked_portion': 1,
+                  'temperature': 1,
                   'sample': True,
-                  'top_k': None,
+                  'top_k': 100,
                   }
 
     file_path = None
