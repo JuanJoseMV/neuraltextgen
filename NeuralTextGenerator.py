@@ -41,11 +41,11 @@ class BertTextGenerator:
         self.model.to(self.device)
         self.use_apex = use_apex
 
-        # Moved to finetune
-        # if use_apex:
-        #     optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
-        #     self.model, optimizer = amp.initialize(self.model, optimizer, opt_level="O2", keep_batchnorm_fp32=True,
-        #                                            loss_scale="dynamic")
+#         Move to finetune
+        if use_apex:
+            optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-3)
+            self.model, optimizer = amp.initialize(self.model, optimizer, opt_level="O2", keep_batchnorm_fp32=True,
+                                                   loss_scale="dynamic")
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_version, do_lower_case="uncased" in model_version,
                                                        use_fast=use_fast,
