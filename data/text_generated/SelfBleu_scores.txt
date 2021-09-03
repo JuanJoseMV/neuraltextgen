@@ -1,5 +1,4 @@
 {'parallel_1_n_sentences=1000,batch_size=100,avg_len=40,std_len=5,generation_method=parallel,masked_portion=1,sample=True,seed_text=,max_iter=500,init_mask_prob=1,temperature=1,top_k=0.txt': 0.06834749455380451,
-
 'parallel_1_n_sentences=1000,batch_size=100,avg_len=40,std_len=5,generation_method=parallel,masked_portion=1,sample=False,seed_text=,max_iter=500,init_mask_prob=0,temperature=10,top_k=0.txt': 0.09844888536121785,
  'attention_penalized_n_sentences=1000,batch_size=100,avg_len=40,std_len=0,generation_method=attention,masked_portion=1,sample=True,seed_text=,max_iter=200,init_mask_prob=0,temperature=0.1,top_k=100.txt': 0.09770860569652166,
  'attention_penalized_n_sentences=1000,batch_size=50,avg_len=40,std_len=0,generation_method=attention,masked_portion=1,sample=True,seed_text=,max_iter=200,init_mask_prob=1,temperature=1,top_k=100.txt': 0.11882362868557202,
