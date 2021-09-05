@@ -103,7 +103,6 @@ two original used to pre-train BERT; that is the mask-prediction.
 BERT have to predict the original tokens.
 The loss is computed as the cross-entropy between the logits for the
 masked tokens outputted by BERT and the original tokens.
-
 This method allows the final user to start from a pretrained model or, if
 it is not available for the language chose by the user, from a cross-language model
 and fine-tuning on a specific text corpus.
@@ -114,14 +113,38 @@ whose weights are randomly initialized.
 Typically, these tokens are replaced with domain specific words,
 so that during the fine-tuning the model will be able to learn them.
 We have extended this idea in order to comprehend also tokens that defines
-the structure of the text like '\\n' '\\t'. Note that replacing in the vocabulary for example the token '[unused1]' with '\\n' would have no effect since the tokenizer would remove these tokens from the text even before the tokenization, during the normalization step. To solve this problem we have implemented a Formatter class that helps the user mantaining a map between some user specified tokens that needs to be preserved and some unused tokens choosed to replace them. The user-specified tokens are replaced with the unused tokens before the tokenization and the finetuning and then are replaced back after the text generation. Using this method we were able to make a model learn the tercet structure of Dante's Divine Comedy.
+the structure of the text like '\textbackslash n' '\textbackslash t'.
+Note that replacing in the vocabulary for example the token '[unused1]'
+with '\textbackslash n' would have no effect since the tokenizer would
+remove these tokens from the text even before the tokenization,
+during the normalization step.
+To solve this problem we have implemented a Formatter class that helps
+the user maintaining a map between some user specified tokens that needs
+to be preserved and some unused tokens chose to replace them.
+The user-specified tokens are replaced with the unused tokens before
+the tokenization and the fine-tuning and are replaced back only after the
+text generation.
+Using this method we were able to make a model learn the tercet structure
+of Dante's Divine Comedy.
 
 \subsubsection{Sentiment generation}
-BERT tokenizer gave also the possibility to define some special tokens. We have took advantage of this to define a new method to generate text with a specific sentiment.
-Considering a set of sentences each one with a possible sentiment  labels in the set ['pos', 'neg'], we define $n$ (3 by default) new special tokens for each possible sentiment. The special tokens are of the type [pos-i] $i=1,
-ldots,n$. Before the finetuning the special tokens corresponding to the sentence sentiment label are appended at the beginning of the sentence. In this manner the model, during the finetuning is able to build a relations among the special tokens of a sentiment and the specific words related to that sentiment. At inference time, to generate some text with a specific sentiment, we simply pass the special tokens of that sentiment as seed\_text of the generae method.
-
-This method, even in it's simplicity, showed it's efficacy in generating positive and negative tweets in italian about football
+BERT tokenizer gave also the possibility to define some special tokens.
+We have took advantage of this to define a new method to generate text
+with a specific sentiment.
+Considering a set of sentences each one with a possible sentiment labels
+in the set ['pos', 'neg'], we define $n$ (3 by default) new special tokens
+for each possible sentiment.
+The special tokens are of the type [pos-i] $i=1,ldots,n$.
+Before the fine-tuning the special tokens corresponding to the sentence
+sentiment label are appended at the beginning of the sentence.
+In this manner the model, during the fine-tuning is able to build a
+relations among the special tokens of a sentiment and the specific words
+related to that sentiment.
+At inference time, to generate some text with a specific sentiment,
+we simply pass the special tokens of that sentiment as seed\_text to the
+generate method.
+This method, even in its simplicity, showed its efficacy in generating positive
+and negative italian tweets about football
 
 %------------------------------------------------------------------------
 \section{Experiments and evaluation}
