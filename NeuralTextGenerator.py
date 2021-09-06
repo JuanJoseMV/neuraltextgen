@@ -331,21 +331,23 @@ class BertTextGenerator:
 
         return idx
 
-    def finetune(self, sentences, labels=None, mask_percentage=0.15, epochs=4, batch_size=32,
+    def finetune(self, sentences, labels=None, encoded_dict=None, mask_percentage=0.15, epochs=4, batch_size=32,
                  optimizer=AdamW, optimizer_parameters=dict(lr=2e-5, eps=1e-8),
                  scheduler=get_linear_schedule_with_warmup, scheduler_parameters=dict(num_warmup_steps=0),
                  num_tokens_per_class=3
                  ):
 
-        # set encoder
-        if labels is None:
-            self.encoder = Encoder(self.tokenizer)
-            encoded_dict = self.encoder.encode(sentences)
-        else:
-            classes = np.unique(labels)
-            self.encoder = LabelEncoder(self.model, self.tokenizer, classes=classes,
-                                        num_tokens_per_class=num_tokens_per_class)
-            encoded_dict = self.encoder.encode(sentences, labels)
+        if encoded_dict is None:
+            # set encoder
+            if labels is None:
+                self.encoder = Encoder(self.tokenizer)
+                encoded_dict = self.encoder.encode(sentences)
+            else:
+                classes = np.unique(labels)
+                self.encoder = LabelEncoder(self.model, self.tokenizer, classes=classes,
+                                            num_tokens_per_class=num_tokens_per_class)
+                encoded_dict = self.encoder.encode(sentences, labels)
+
 
         # Retrieve tokenized sentences and attention masks
         input_ids = encoded_dict['input_ids']
