@@ -72,7 +72,7 @@ class LabelEncoder(Encoder):
         # k is an integer value in range(0, num_tokens_per_class)
         self.num_tokens_per_class = num_tokens_per_class
         self.label_special_tokens_dict = {cls: [f'[{cls}-{i}]' for i in range(num_tokens_per_class)] for cls in classes}
-        self.label_special_tokens_list = np.concatenate([list(x) for x in  self.label_special_tokens_dict.values()])
+        self.label_special_tokens_list = np.concatenate([list(x) for x in self.label_special_tokens_dict.values()]).tolist()
 
 
         # Addd special tokens and replace vocabulary
@@ -81,5 +81,5 @@ class LabelEncoder(Encoder):
 
 
     def encode(self, lines, labels):
-        labeled_lines = [' '.join(self.special_tokens[label]) + line for line, label in zip(lines, labels)]
-        return super().tokenize(labeled_lines)
+        labeled_lines = [' '.join(self.label_special_tokens_dict[label]) + ' ' + line for line, label in zip(lines, labels)]
+        return super().encode(labeled_lines)
