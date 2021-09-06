@@ -81,5 +81,5 @@ class LabelEncoder(Encoder):
 
 
     def encode(self, lines, labels):
-        labeled_lines = [' '.join(self.special_tokens[label]) + line for line, label in zip(lines, labels)]
-        return super().tokenize(labeled_lines)
+        labeled_lines = [' '.join(self.label_special_tokens_dict[label]) + ' ' + line for line, label in zip(lines, labels)]
+        return super().encode(labeled_lines)
