@@ -6,6 +6,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{cite}
 
 % Include other packages here, before hyperref.
 
@@ -69,34 +70,70 @@ should read this new version.
 %-------------------------------------------------------------------------
 \section{Current methods}
 
+In recent years, the field of Natural Language Generation (NLG) has expanded its repertoire
+of solutions for text generation to include a variety of methods.
+Models such as RNN's, Bi-LSTM [*], Transformers-based models (e.g.\ GPT [*]), GAN's, among others, have evolved
+to produce elaborate pieces of text for different specifics tasks.
+Each method proposes a different approach to the task at hand.
+
 \subsection{RNN}
+
+Recurrent Neural Networks (RNN) are commonly used in sequence-to-sequence (seq2seq) tasks, such as text generation.
+Simple RNN's have been adapted to overcome its own limitations, e.g.\ vanishing or exploding gradients,
+introducing concepts such as Long Short Term Memory networks (LSTM) or even bidirectional LSTM's (Bi-LSTM).
+Bi-LSTM have been used in many cases for text generation [*] improving its performance in some cases [*].
+These models are still used in recent years for text generation in different languages [*].
+Some studies [*] use external word embeddings for the training process which can be seen as pre-trained
+models for text generation.
+
+In this work, we train a simple RNN with an Embedding layer, one LSTM module and a dense output layer.
+The task of the RNN is to predict the next word for the text generation.
+For this net, several hyperparameters can be set such as the number of LSTM layers, whether those layers
+are bidirectional, pre-trained word embeddings, among many others.
+The configuration that best minimized the cross-entropy loss was an embedding layer with no pre-trained embeddings,
+three bidirectional LSTM layers and one dense output layer.
+With this configuration, 1000 sentences were generated for comparison with alternative methods.
 
 \subsection{Transformers}
 
+With the introduction of [*], new models for text generations task have arisen.
+[*] introduces an Encoder-Decoder based architecture for machine translation tasks.
+This architecture was ingeniously modified by [*] and [*] to yield models such as BERT and GPT.
+Both Generative Pre-trained Transformer (GPT) and Bidirectional Encoder Representations from Transformers (BERT)
+are based on the idea of transformers and can be finetunned and adapted for a variety of tasks [***].
+These models have slowly replaced the RNN approaches.
+As [*ModernMethodsOfTextGeneration] states: "Transformers disrupted sequence-based deep learning significantly.
+The two variants of transformer models that we showed, BERT and GPT-2, outperform
+previous approaches with RNNs".
+
+GPT is widely known as a powerful tool for text generation.
+Conversely, the BERT model alone has not been accepted as a strong generative model.
+Some authors \cite{wang2019bert} have proposed workarounds to BERT limitations for text generation.
 
 %------------------------------------------------------------------------
 \section{BertTextGenerator}
 BERT is a language representation model designed to achieve state-of-art results
-in several natural language processing tasks like question answering and language inference.
+in several natural language processing tasks such as question answering and language inference.
 BERT is trained on masked language modeling objective, in which it predicts a word given its
-left and right context, given this behavior it is possible to deduct that BERT is not the most
-indicated model for text generation tasks, however \cite{wang2019bert} have demonstrated why
-it is possible to use BERT as a traditional language model by means of showing that BERT is a
-combination of a 'Markov random field language model (MRF-LM), with pseudo Log-Likelihood training'.
+left and right context.
+Given this behavior, it is possible to deduct that BERT is not the most
+indicated model for text generation tasks.
+However, \cite{wang2019bert} have demonstrated why it is possible to use BERT as a traditional
+language model by means of showing that BERT is a combination of a 'Markov random field
+language model (MRF-LM), with pseudo Log-Likelihood training'.
 
-This conclusion allows to use BERT as a generative model of sentences to either score a sentence or
+This conclusion allows using BERT as a generative model of sentences to either score a sentence or
 sample a sentence.
 To score a sentence with BERT is possible to compute the unnormalized log-probabilities of a set of
-sentences and then based of this it is possible to sort the set of sentences according to their probabilities.
+sentences and then, based on this, it is possible to sort the set of sentences according to their probabilities.
 To sample a sentence with BERT it is necessary to start with a random initial state which is initialized to be
-an all-mask sequence i.e., ([MASK], …,[MASK]), then at each iteration i, a position is selected in a random uniformly
-way and mask out to be replaced by a new token according with the probability of the token of being present in current
-sequence of tokens.
+an all-mask sequence, i.e. ([MASK], ...,[MASK]).
+Then, at each iteration i, a position is selected in a random uniform way and mask out to be replaced
+by a new token according to the probability of the token being present in the current sequence of tokens.
 
-They have made several experiments to demonstrate the potential of BERT as a text generation algorithm,
-with the obtained results was possible to conclude that even if the BERT generations are of worst quality
+Several experiments have been made to demonstrate the potential of BERT as a text generation algorithm.
+With the obtained results was possible to conclude that even when the BERT generations are of the worst quality,
 compared with models like GPT, the text generated by BERT is more diverse and this is a meaningful result.
-
 
 %------------------------------------------------------------------------
 \subsection{Attention method}
@@ -129,10 +166,10 @@ In this case the focus of the fine-tuning would be on the [CLS] token,
 a special token specifically used for classification tasks.
 
 In this case however the task is different and unusual for BERT.
-Since we need to use BERT to generate text it is important that during the
+Since we need to use BERT to generate text, it is important that during the
 fine-tuning the model understands the structure of the text.
 
-We have implemented a fine-tuning method that gave completely freedom to the user to decide the language,
+We have implemented a fine-tuning method that gave complete freedom to the user to decide the language,
 the structure and even the sentiment of the text to generate.
 The fine-tuning is performed considering only one task of the
 two original used to pre-train BERT; that is the mask-prediction.
@@ -151,12 +188,12 @@ Typically, these tokens are replaced with domain specific words,
 so that during the fine-tuning the model will be able to learn them.
 We have extended this idea in order to comprehend also tokens that defines
 the structure of the text like '\textbackslash n' '\textbackslash t'.
-Note that replacing in the vocabulary for example the token '[unused1]'
+Note that replacing in the vocabulary, for example, the token '[unused1]'
 with '\textbackslash n' would have no effect since the tokenizer would
 remove these tokens from the text even before the tokenization,
 during the normalization step.
 To solve this problem we have implemented a Formatter class that helps
-the user maintaining a map between some user specified tokens that needs
+the user by maintaining a map between some user specified tokens that needs
 to be preserved and some unused tokens chose to replace them.
 The user-specified tokens are replaced with the unused tokens before
 the tokenization and the fine-tuning and are replaced back only after the
@@ -166,22 +203,24 @@ of Dante's Divine Comedy.
 
 \subsubsection{Sentiment generation}
 BERT tokenizer gave also the possibility to define some special tokens.
-We have took advantage of this to define a new method to generate text
+We have taken advantage of this to define a new method to generate text
 with a specific sentiment.
 Considering a set of sentences each one with a possible sentiment labels
 in the set ['pos', 'neg'], we define $n$ (3 by default) new special tokens
 for each possible sentiment.
 The special tokens are of the type [pos-i] $i=1,ldots,n$.
-Before the fine-tuning the special tokens corresponding to the sentence
+Before the fine-tuning, the special tokens corresponding to the sentence
 sentiment label are appended at the beginning of the sentence.
-In this manner the model, during the fine-tuning is able to build a
-relations among the special tokens of a sentiment and the specific words
+In this manner, the model, during the fine-tuning, is able to build a
+relation among the special tokens of a sentiment and the specific words
 related to that sentiment.
+
 At inference time, to generate some text with a specific sentiment,
 we simply pass the special tokens of that sentiment as seed\_text to the
 generate method.
+
 This method, even in its simplicity, showed its efficacy in generating positive
-and negative italian tweets about football
+and negative italian tweets about football.
 
 %------------------------------------------------------------------------
 \section{Experiments and evaluation}
@@ -189,7 +228,7 @@ and negative italian tweets about football
 %-------------------------------------------------------------------------
 \section{Conclusions}
 
-\section*{References}
-
+\bibliographystyle{ieeetr}
+\bibliography{egbib}
 
 \end{document}
