@@ -325,14 +325,10 @@ In addition, this method will allow the possibility to consider even more than t
 %------------------------------------------------------------------------
 \section{Experiments and evaluation}
 
-\subsection{Experiments}
-Grid search
-RNN experiments
-\subsection{Evaluation}
-
-\subsubsection{Quality measures}
-Corpus Bleu, perplexity and rough
-
+Grid search explanation
+Best model 1000 sents
+Corpus Bleu, perplexity and rouge
+Self-Bleu and n-Grams
 \begin{table}[]
 \begin{tabular}{llll}
 \hline
@@ -355,13 +351,8 @@ Sequential 3                               & 5.5            &  6.08          &  
 \end{tabular}
 \end{table}
 
-\subsubsection{Diversity measures}
-Self-Bleu and n-Grams
-\subsubsection{Comparison with the RNN}
-\subsubsection{Sentiment evaluation}
 
-
-\subsubsection{Italian generation: finetuning testing}
+\subsection{Italian generation: finetuning testing}
 In order to test the goodness of the fine-tuning implementation we have performed three experiments.
 All the experiments have been performed on Italian sets of text and for all the experiments we started from a pretrained
 italian BERT model, freely downloadable from huggingface [].
@@ -386,8 +377,7 @@ all structured in the same way.
 %   esta selva selvaggia e aspra e forte\\
 %   che nel pensier rinova la paura!\\
 \end{quote}
-
-The model were fine-tuned on tercets (groups of three lines) instead of single lines.
+The model was fine-tuned on tercets (groups of three lines) instead of single lines.
 Moreover, we have replaced '\textbackslash n' with 'unused1' tokens in order to make BERT learn the structure of the tercets.
 
 \begin{quote}
