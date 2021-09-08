@@ -43,8 +43,13 @@ class Formatter():
 
 class Encoder():
     def __init__(self, tokenizer):
+        self.set_tokenizer(tokenizer)
+
+    def set_tokenizer(self, tokenizer):
         self.tokenizer = tokenizer
 
+    def set_model(self, model):
+        self.model = model
 
     def encode(self, lines):
 
@@ -65,7 +70,7 @@ class LabelEncoder(Encoder):
     def __init__(self, model, tokenizer, classes=[], num_tokens_per_class=3):
 
         super().__init__(tokenizer)
-
+        self.set_model(model)
 
         # Preparing special tokens related to labels.
         # Each token is of the type 'cls-k' where cls is a class in classes and
@@ -77,7 +82,7 @@ class LabelEncoder(Encoder):
 
         # Addd special tokens and replace vocabulary
         self.tokenizer.add_special_tokens({'additional_special_tokens': self.label_special_tokens_list})
-        model.resize_token_embeddings(len(self.tokenizer))
+        self.model.resize_token_embeddings(len(self.tokenizer))
 
 
     def encode(self, lines, labels):

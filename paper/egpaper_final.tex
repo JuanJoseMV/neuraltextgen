@@ -6,6 +6,8 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{mathrsfs}
+
 \usepackage{cite}
 \graphicspath{ {images/} }
 % Include other packages here, before hyperref.
@@ -22,7 +24,7 @@
 
 % Pages are numbered in submission mode, and unnumbered in camera-ready
 %\ifcvprfinal\pagestyle{empty}\fi
-\setcounter{page}{4321}
+\setcounter{page}{1}
 \begin{document}
 
 %%%%%%%%% TITLE
@@ -100,7 +102,7 @@ With the introduction of [*], new models for text generations task have arisen.
 [*] introduces an Encoder-Decoder based architecture for machine translation tasks.
 This architecture was ingeniously modified by [*] and [*] to yield models such as BERT and GPT.
 Both Generative Pre-trained Transformer (GPT) and Bidirectional Encoder Representations from Transformers (BERT)
-are based on the idea of transformers and can be finetunned and adapted for a variety of tasks [***].
+are based on the idea of transformers and can be finetuned and adapted for a variety of tasks [***].
 These models have slowly replaced the RNN approaches.
 As [*ModernMethodsOfTextGeneration] states: "Transformers disrupted sequence-based deep learning significantly.
 The two variants of transformer models that we showed, BERT and GPT-2, outperform
@@ -243,69 +245,82 @@ and the sampling method is not focus in only few parts of the sequence.
 
 %------------------------------------------------------------------------
 \subsection{Finetuning}
-BERT is a powerful model pre-trained on a broad corpus composed by the whole
-Wikipedia and Brown corpora.
-Typical fine-tuning techniques depends on the final task that the user wants BERT to perform.
-For example, a classical application of the model is to predict the sentiment of a sentence.
-In this case the focus of the fine-tuning would be on the [CLS] token,
-a special token specifically used for classification tasks.
+BERT is a powerful model pre-trained on a broad set of text composed by the whole
+Wikipedia and Brown corpora [].
+One of its main feature is its adaptability to a plethora of different tasks,
+by means of a fine-tuning on specific domain set.
 
-In this case however the task is different and unusual for BERT.
-Since we need to use BERT to generate text, it is important that during the
-fine-tuning the model understands the structure of the text.
+Typical fine-tuning techniques depends on the final task that the user requires BERT to perform.
+For example, considering classification tasks such as sentiment prediction and text classification,
+the fine-tuning will be focused on the [CLS] token, a special token used in the pre-training phase for the task
+of “next sentence prediction” and specifically designed for classification applications.
 
-We have implemented a fine-tuning method that gave complete freedom to the user to decide the language,
-the structure and even the sentiment of the text to generate.
-The fine-tuning is performed considering only one task of the
-two original used to pre-train BERT; that is the mask-prediction.
-15\% of the tokens of each sentence are replaced with a masked token and
-BERT have to predict the original tokens.
-The loss is computed as the cross-entropy between the logits for the
-masked tokens outputted by BERT and the original tokens.
-This method allows the final user to start from a pretrained model or, if
-it is not available for the language chose by the user, from a cross-language model
-and fine-tuning on a specific text corpus.
+Text generation is not a usual task for BERT, due to the fact that it is not a proper language model.
+In the case of text generation, the fine-tuning aims to make the model understand the structure of the text,
+in order to mimic it at inference time.
 
-The fine-tuning allows also to exploit the enormous potentialities of BERT tokenizer.
-The default vocabulary of the tokenizer contains 1000 unused tokens,
-whose weights are randomly initialized.
-Typically, these tokens are replaced with domain specific words,
-so that during the fine-tuning the model will be able to learn them.
+We have implemented a fine-tuning procedure that rely on a task of mask prediction, as in the original training of BERT [].
+In addition, in the case of a domain set with associated sentiments (or in general labels) we have designed
+a system able to learn the structure of the text associated with each label and that leaves to the final user
+the possibility to decide the sentiment of the text to generate.
+
+The basic fine-tuning is performed replacing with the [MASK] token a percentage (15\% by default as in the original
+training) of the tokens for each sentence.
+Then the sentences are passed through the model.
+The output of the model is a tensor of logits of dimension $num_sentences \times num\_tokens \times num\_words\_vocabulary$.
+For each sentence, only the logits corresponing to the masked token are extracted and used to compute the cross-entropy
+loss with respect to the original token that were replaced.
+
+
+\subsubsection{Generation of text with a specific structure}
+
+This method allows the final user to start from a pretrained model and fine-tune it on a specific
+text corpus in order then to make it generate text that similar to the original one.
+This approach works also in the case that a pretrained model is not available in th language selected by the user.
+In this case, the user can simply start from a cross-language model [...]
+
+Moreover, the fine-tuning allows to exploit the enormous potentialities of BERT tokenizer.
+The default vocabulary of the tokenizer contains around 1000 unused tokens, whose weights are randomly initialized.
+Typically, these tokens are replaced with domain specific words, so that during the fine-tuning phase
+the model will be able to learn their representation.
+
 We have extended this idea in order to comprehend also tokens that defines
 the structure of the text like '\textbackslash n' '\textbackslash t'.
-Note that replacing in the vocabulary, for example, the token '[unused1]'
-with '\textbackslash n' would have no effect since the tokenizer would
-remove these tokens from the text even before the tokenization,
-during the normalization step.
-To solve this problem we have implemented a Formatter class that helps
-the user by maintaining a map between some user specified tokens that needs
-to be preserved and some unused tokens chose to replace them.
-The user-specified tokens are replaced with the unused tokens before
-the tokenization and the fine-tuning and are replaced back only after the
-text generation.
-Using this method we were able to make a model learn the tercet structure
-of Dante's Divine Comedy.
+Note that, simply adding these tokens to the vocabulary or replacing with unused tokens would have no effect.
+These tokens in fact, are typically replaced even before the tokenization, during the normalization step of the Tokenizer pipeline.
+However, depending on the context, these tokens can be important. This can be especially true in the task of generating text.
+
+We have implemented a Formatter class that helps the user to format the important tokens for the structure, before the tokenization.
+The Formatter replaces a user specified set of tokens that need to be preserved, with some unused-tokens.
+The replacement happens before the tokenization; in this manner, during the fine-tuning the model will be able to learn
+the position of these important tokens.
+The unused tokens are replaced back with the original tokens automatically after the generation of the text.
+
+Using this method we were able to make a model learn the famous tercet structure of Dante's Divine Comedy.
 
 \subsubsection{Sentiment generation}
-BERT tokenizer gave also the possibility to define some special tokens.
-We have taken advantage of this to define a new method to generate text
-with a specific sentiment.
-Considering a set of sentences each one with a possible sentiment labels
-in the set ['pos', 'neg'], we define $n$ (3 by default) new special tokens
-for each possible sentiment.
-The special tokens are of the type [pos-i] $i=1,ldots,n$.
-Before the fine-tuning, the special tokens corresponding to the sentence
-sentiment label are appended at the beginning of the sentence.
-In this manner, the model, during the fine-tuning, is able to build a
-relation among the special tokens of a sentiment and the specific words
+\label{sentiment}
+An important aspect of BERT tokenizer are special tokens like [CLS], [MASK] and [SEP].
+As the name suggests, these are tokens with specific functions.
+The tokenizer gave the possibility to define new special tokens.
+We have taken advantage of this, in order to define a new method to generate text with a specific sentiment or label.
+
+Consider a domain set $\mathcal S$ of sentences each one with an attached label $y\in \mathcal Y$.
+For simplicity, we can consider a text whose label-set are the two possible sentiments $\mathcal Y =\{pos, neg\}$.
+The method consists in three main steps:
+
+\begin{itemize}
+\item For each sentiment in the label set $y\in\mathcal Y$, we define $n$ (3 by default) special tokens $[y_i]\;\; for\;\;i=1,\ldots n$.
+In the case of $y=pos$ for example the set of special tokens will be $\{'\text{[pos-1]}', '\text{[pos-2]}, '\text{[pos-3]}'\}$
+\item Before the fine-tuning each sentence $s\in\mathcal S$ is tokenized, and the special tokens are appended at the beginning of the list of tokens.
+\item The fine-tuning is performed. During this step the model will build a relation among the special tokens of a sentiment and the specific words
 related to that sentiment.
+\item To generate the text with a given sentiment, the special tokens related to that sentiment are used as seed to create a context on top of which BERT can start generate the text.
 
-At inference time, to generate some text with a specific sentiment,
-we simply pass the special tokens of that sentiment as seed\_text to the
-generate method.
+\end{itemize}
 
-This method, even in its simplicity, showed its efficacy in generating positive
-and negative italian tweets about football.
+This method, even in its simplicity, showed its efficacy in generating positive and negative italian tweets about football.
+In addition, this method will allow the possibility to consider even more than two labels.
 
 %------------------------------------------------------------------------
 \section{Experiments and evaluation}
@@ -344,6 +359,64 @@ Sequential 3                               & 5.5            &  6.08          &  
 Self-Bleu and n-Grams
 \subsubsection{Comparison with the RNN}
 \subsubsection{Sentiment evaluation}
+
+
+\subsubsection{Italian generation: finetuning testing}
+In order to test the goodness of the fine-tuning implementation we have performed three experiments.
+All the experiments have been performed on Italian sets of text and for all the experiments we started from a pretrained
+italian BERT model, freely downloadable from huggingface [].
+
+%\subsubsection{Motivational quotes}
+\paragraph{Motivational quotes} The first experiment aimed at showing the functionality of the fine-tuning method.
+To do that we have gathered a small set of motivational quotes.
+The set was constructed scraping from different sources, and the quotes were preprocessed in order to make them
+all structured in the same way.
+\begin{quote}
+   A motivational quote - (anonymous)
+\end{quote}
+
+\paragraph{Dante's divine comedy} The second experiment was focused on the structure of the text, for this part we have used Dante's Divine Comedy.
+
+\begin{quote}
+   Nel mezzo del cammin di nostra vita\\
+   mi ritrovai per una selva oscura,\\
+   ché la diritta via era smarrita.\\
+
+%   Ahi quanto a dir qual era è cosa dura\\
+%   esta selva selvaggia e aspra e forte\\
+%   che nel pensier rinova la paura!\\
+\end{quote}
+
+The model were fine-tuned on tercets (groups of three lines) instead of single lines.
+Moreover, we have replaced '\textbackslash n' with 'unused1' tokens in order to make BERT learn the structure of the tercets.
+
+\begin{quote}
+['Nel', 'mezzo', 'del', 'cammin', 'di', 'nostra', 'vita', \textbf{'unused1'},
+ 'mi',
+ 'ritrovai',
+ 'per', \ldots
+% 'una',
+% 'selva',
+% 'oscura,',
+% \textbf{'unused1'},
+% 'ché',
+% 'la',
+% 'diritta',
+% 'via',
+% 'era',
+% 'smarrita.',
+% \textbf{'unused1'}]
+\end{quote}
+
+\paragraph{Sentiment generation} The aim of the third experiment was the sentiment generation.
+In this case we have used a dataset [] composed by num italian tweets.
+Each tweet has associated a sentiment score for each one of 4 possible labels
+$\mathcal Y = \{\text{POSITIVE}, \text{NEGATIVE}, \text{MIXED}, \text{NEUTRAL}\}$ and a sentiment label corresponding
+to the sentiment with the highset score. 
+The dataset was highly imbalanced, with respect to the last two classes, so we have considered only the first two.
+The dataset was preprocessed as explained in \ref{sentiment}; in addition a set of tokens was added in order to deal
+with '@tags' and '#hashtags'.
+
 
 
 %-------------------------------------------------------------------------
