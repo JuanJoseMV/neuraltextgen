@@ -242,7 +242,6 @@ get stuck during several iterations in the same areas of the sequence, for examp
 10 to 16, the probability was focus on the last 4 tokens of the sequence.
 While in the penalized attention is possible to see a more balance probability distribution inside each iteration
 and the sampling method is not focus in only few parts of the sequence.
-
 %------------------------------------------------------------------------
 \subsection{Finetuning}
 BERT is a powerful model pre-trained on a broad set of text composed by the whole
@@ -261,42 +260,36 @@ We have implemented a fine-tuning procedure that rely on \textit{Cloze} task pre
 This consists on replacing a percentage (15\% by default) of the tokens for each sentence with a [MASK] token and let
 BERT predict the blanks. The logits outputted by the model are then used to to compute the cross-entropy
 loss with respect to the original token that were replaced.
-
-\subsubsection{Generation of text with a specific structure}
-
 This method allows the final user to start from a pretrained model and fine-tune it on a specific
 text corpus in order then to make it generate text that similar to the original one.
-This approach works also in the case that a pretrained model is not available in th language selected by the user.
+This approach also works  in the case that a pretrained model is not available in th language selected by the user.
 In this case, the user can simply start from a cross-language model [...]
 
-Moreover, the fine-tuning allows to exploit the enormous potentialities of BERT tokenizer.
+\subsubsection{Generation of text with a specific structure}
 The default vocabulary of the tokenizer contains around 1000 unused tokens, whose weights are randomly initialized.
 Typically, these tokens are replaced with domain specific words, so that during the fine-tuning phase
 the model will be able to learn their representation.
 
-We have extended this idea in order to comprehend also tokens that defines
-the structure of the text like '\textbackslash n' '\textbackslash t'.
+We have extended this idea in order to comprehend also tokens that defines the structure of the text like '\textbackslash n' '\textbackslash t'.
 Note that, simply adding these tokens to the vocabulary or replacing with unused tokens would have no effect.
-These tokens in fact, are typically replaced even before the tokenization, during the normalization step of the Tokenizer pipeline.
-However, depending on the context, these tokens can be important. This can be especially true in the task of generating text.
+These tokens in fact, are typically replaced even before the tokenization, during the normalization step of the Tokenizer pipeline [].
+However, depending on the context, these tokens can be important. This can be especially true in the task of text generation.
 
-We have implemented a Formatter class that helps the user to format the important tokens for the structure, before the tokenization.
+We have implemented a Formatter class that helps the user to format the text in order to preserve the important tokens.
 The Formatter replaces a user specified set of tokens that need to be preserved, with some unused-tokens.
-The replacement happens before the tokenization; in this manner, during the fine-tuning the model will be able to learn
-the position of these important tokens.
-The unused tokens are replaced back with the original tokens automatically after the generation of the text.
+The replacement happens before the tokenization, in this manner, during the fine-tuning the model will be able to learn
+the position of these  tokens. The unused tokens are then replaced back with the original ones after the generation.
 
-Using this method we were able to make a model learn the famous tercet structure of Dante's Divine Comedy.
+Using this method we were able to make a model learn the famous tercet structure of Dante's Divine Comedy \ref{}.
 
 \subsubsection{Sentiment generation}
 \label{sentiment}
 An important aspect of BERT tokenizer are special tokens like [CLS], [MASK] and [SEP].
 As the name suggests, these are tokens with specific functions.
 The tokenizer gave the possibility to define new special tokens.
-We have taken advantage of this, in order to define a new method to generate text with a specific sentiment or label.
+We have taken advantage of this, with the object of define a new method to generate text with a specific sentiment or label.
 
-Consider a domain set $\mathcal S$ of sentences each one with an attached label $y\in \mathcal Y$.
-For simplicity, we can consider a text whose label-set are the two possible sentiments $\mathcal Y =\{pos, neg\}$.
+Considere a domain set $\mathcal S$ of sentences each one with an attached label $y\in \mathcal Y$, i.e.\ a text whose label-set are the two possible sentiments $\mathcal Y =\{pos, neg\}$.
 The method consists in three main steps:
 
 \begin{itemize}
@@ -304,9 +297,14 @@ The method consists in three main steps:
 In the case of $y=pos$ for example the set of special tokens will be $\{'\text{[pos-1]}', '\text{[pos-2]}, '\text{[pos-3]}'\}$
 \item Before the fine-tuning each sentence $s\in\mathcal S$ is tokenized, and the special tokens are appended at the beginning of the list of tokens.
 \item The fine-tuning is performed. During this step the model will build a relation among the special tokens of a sentiment and the specific words
-related to that sentiment.
-\item To generate the text with a given sentiment, the special tokens related to that sentiment are used as seed to create a context on top of which BERT can start generate the text.
-
+related to it.
+\item To generate the text with a given sentiment, the special tokens related to that sentiment are used as seed to create a context on top of which BERT can start generate.
+$$\begin{bmatrix}\end*{}
+   \begin*{}\underbrace{\text{[CLS]} \;\; \text{[pos-1]} \;\; \text{[pos-2]} \;\; \text{[pos-3]}}_{seed}&\end*{}
+   \begin*{}
+      \text{[MASK]} &\ldots
+   \end{bmatrix}
+   $$
 \end{itemize}
 
 This method, even in its simplicity, showed its efficacy in generating positive and negative italian tweets about football.
