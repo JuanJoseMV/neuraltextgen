@@ -360,6 +360,43 @@ In this sense, it is not simple to evaluate a text generator model based on a si
 % Corpus Bleu, perplexity and rouge
 % Self-Bleu and n-Grams
 
+We have made a Grid Search to analyze the behavior of the generations with the variation of the parameters,
+and to choose the best combination of parameters for each one of the sampling methods. For each one of the
+combinations of parameters we have made five different generations each one with 500 text lines generated,
+then we calculated different measures to analyze the quality and the diversity of the generations like
+Corpus-Bleu on Wikitex-103 and TBC, rough and \%Unique-Ngrams. We select the three bests models for each
+generation method by means of comparing all the measures. Finally, we generated 1000 text lines with each one
+of the models, we evaluate the final generations and based on the results we choose the best combination of
+parameters for each model, in the following table \ref{tab:parameters} we report the parameters of each model.
+
+In table \ref{tab:parameters}, we report the Bleu scores with respect to WT103 and TBC for the best models we found,
+the results of the original paper \cite{wang2019bert}, the results of the original paper but evaluating the generated
+text with the Texygen library, and a RNN we trained on WT103.5 and TBC, in the following section we discuss more about
+the RNN model. It is possible to note that the proposed attention method is very near of the base line marked by the
+original paper, even outperforming the base line in the corpus-Bleu measure with respect to WT103.
+
+\begin{table}
+\centering
+\begin{tabular}{lllll}
+\hline
+\multicolumn{1}{c}{}                            & \multicolumn{4}{c}{\vcell{Model}}                  \\[-\rowheight]
+\cline{2-5}
+\multicolumn{1}{c}{\multirow{}{}{Parameter}}                           & Parallel1 & Parallel0.15 & Sequential & Attention  \\
+\hline
+Avg\_len                                       & 40        & 40           & 40         & 40         \\
+Std\_len                                       & 5         & 0            & 5          & 0          \\
+Masked\_p                                      & 1         & 0.15         & 1          & 1          \\
+Sample                                         & True      & True         & True       & True       \\
+Init\_mask\_p                                  & 1         & 1            & 0          & 1          \\
+Temperature                                    & 1         & 1            & 1          & 1          \\
+Top\_k                                         & 0         & 100          & 100        & 100        \\
+\hline
+\end{tabular}
+\caption{Parameters configuration of the best models obtained for each generation method.}
+\label{tab:parameters}
+\end{table}
+
+
 
 \begin{table}[]
 \begin{tabular}{lllll}
