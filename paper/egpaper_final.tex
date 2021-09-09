@@ -400,7 +400,6 @@ the results of the original paper \cite{wang2019bert}, the results of the origin
 text with the Texygen library, and a RNN we trained on WT103.5 and TBC, in the following section we discuss more about
 the RNN model. It is possible to note that the proposed attention method is very near of the base line marked by the
 original paper, even outperforming the base line in the corpus-Bleu measure with respect to WT103.
-
 \subsection{Convergence of the attention sampling method}
 We have compared also the converge of the attention method with respect to the original sampling method (parallel).
 To do this we have run 80 generation experiments. Each sentence was initialized with a list of 25 [MASK] tokens and
@@ -412,8 +411,7 @@ with a complete sentence. Moreover the results showed a very high variability.
 On the other hand the attention method penalized showed a much faster replacement of the initial [MASK] tokens.
 \begin{figure}[t!]
    \centering
-   \includesvg{test.svg}
-%   \includegraphics[scale=0.3]{test.svg}
+   \includegraphics[scale=0.3]{num_iter_replace_mask.png}
    \caption{
    }
    \label{fig:ReplaceMask}
@@ -548,7 +546,6 @@ in order to deal with '@tags' and '#hashtags'.\\
 \end{quote}
 
 
-%-------------------------------------------------------------------------
 \section{Conclusions}
 In this project we explored the usage of BERT as a text generator,
 focusing in particular on the sampling methods.
@@ -572,7 +569,6 @@ outperforming the others. This suggests the possibility of future exploration in
 of the generation method. In particular it could be interesting a further investigation
 of the resampling part and the implementation of a scheduling of the temperature of the logits,
 in order to help the generation method to not get stuck in the early stages of the generation.
-
 \bibliographystyle{ieeetr}
 \bibliography{egbib}
 
