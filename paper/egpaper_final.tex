@@ -173,13 +173,6 @@ on the special tokens "[CLS]" and "[SEP]" that represent the beginning and the e
 respectively, finally other attention heads would focus on the word "animal". In this way BERT can
 understand which parts of the context are more relevant.
 
-\begin{figure}
-   \centering
-   \includegraphics[scale=0.7]{attComp.PNG}
-   \caption{Comparison of the behavior of the proposed sampling methods.}
-   \label{fig:AttentComp}
-\end{figure}
-
 \subsubsection{Using the attention mechanism to improve the sampling method.}
 When a token is predicted, it is possible to know which tokens of the context were more relevant to
 retrieve the prediction based on the attention weights.
@@ -203,6 +196,13 @@ few tokens of the sequence, then the sample got stuck always choosing the same t
 all the iterations.
 To solve this behavior, we add a penalization to those tokens that were
 chosen several times, in the next section we describe the new method.
+
+\begin{figure}
+   \centering
+   \includegraphics[scale=0.7]{attComp.PNG}
+   \caption{Comparison of the behavior of the proposed sampling methods.}
+   \label{fig:AttentComp}
+\end{figure}
 
 \paragraph{Penalized attention sampling}
 This method is very similar to the previous one, however, we include a penalization factor
