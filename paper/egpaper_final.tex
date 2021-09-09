@@ -152,6 +152,9 @@ softmax function to retrieve the probability of each token to be inserted on the
 the new token is selected.
 \end{itemize}
 
+The initialization is made only once at the beginning of the generation process, the sampling and the replacing are
+made once for each iteration of the model.
+
 %------------------------------------------------------------------------
 \subsection{Attention mechanism}
 The attention mechanism is composed by a feed forward neural network that is trained to
@@ -163,9 +166,9 @@ and the verb "was" is the correct conjugation of the verb "To be" for the third 
 algorithm is not easy to know these relationships and that is the task of the attention mechanism.
 
 For example, In the sentence "the animal didn't cross the street because it was too tired"
-some attention heads are going to focus on the verb "was", other attention heads are focused
+some attention heads would focus on the verb "was", other attention heads would focus
 on the special tokens "[CLS]" and "[SEP]" that represent the beginning and the end of the sentence
-respectively, finally other attention heads will focus on the word "animal". In this way BERT can
+respectively, finally other attention heads would focus on the word "animal". In this way BERT can
 understand which parts of the context are more relevant.
 
 \begin{figure}
@@ -300,48 +303,13 @@ $$\begin{bmatrix}\text{[CLS]} \end*{}
 This method, even in its simplicity, showed its efficacy in generating positive and negative italian tweets about football.
 In addition, this method will allow the possibility to consider even more than two labels.
 %------------------------------------------------------------------------
-\section{Experiments and evaluation}
-
-The evaluation of generated text is not a simple task.
-Some evaluations rely on intrinsic or extrinsic techniques.
-Within these techniques metrics such as n-gram overlap metrics (f-score, bleu, self-bleu, rouge, meteor),
-distance-based metrics, diversity metrics, content overlap metrics or even grammatical feature based
-are taken into account.
-Each metric reflects different results.
-For example, the self-bleu represents the diversity of the text \cite{texygen}.
-But this metrics are not perfect and can also be deceived.
-\cite{evaltextgen1} explains the different struggles these measures have.
-For example, it states that "a language model optimized only for perplexity
-may generate coherent but bland responses."
-In this sense, it is not simple to evaluate a text generator model based on a single metric.
-
-% Grid search explanation
-% Best model 1000 sents
-% Corpus Bleu, perplexity and rouge
-% Self-Bleu and n-Grams
-
-We have made a Grid Search to analyze the behavior of the generations with the variation of the parameters,
-and to choose the best combination of parameters for each one of the sampling methods. For each one of the
-combinations of parameters we have made five different generations each one with 500 text lines generated,
-then we calculated different measures to analyze the quality and the diversity of the generations like
-Corpus-Bleu on Wikitex-103 and TBC, rough and \%Unique-Ngrams. We select the three bests models for each
-generation method by means of comparing all the measures. Finally, we generated 1000 text lines with each one
-of the models, we evaluate the final generations and based on the results we choose the best combination of
-parameters for each model, in the following table \ref{tab:parameters} we report the parameters of each model.
-
-In table \ref{tab:parameters}, we report the Bleu scores with respect to WT103 and TBC for the best models we found,
-the results of the original paper \cite{wang2019bert}, the results of the original paper but evaluating the generated
-text with the Texygen library, and a RNN we trained on WT103.5 and TBC, in the following section we discuss more about
-the RNN model. It is possible to note that the proposed attention method is very near of the base line marked by the
-original paper, even outperforming the base line in the corpus-Bleu measure with respect to WT103.
-
 \begin{table}
 \centering
 \begin{tabular}{lllll}
 \hline
 \multicolumn{1}{c}{}                            & \multicolumn{4}{c}{\vcell{Model}}                  \\[-\rowheight]
 \cline{2-5}
-\multicolumn{1}{c}{\multirow{}{}{Parameter}}                           & Parallel1 & Parallel0.15 & Sequential & Attention  \\
+\multicolumn{1}{c}{\multirow{}{}{Parameter}}                           & \begin{tabular}[c]{@{}l@{}}Parallel\\ 1\end{tabular} & \begin{tabular}[c]{@{}l@{}}Parallel\\ 0.15\end{tabular} & Sequential & Attention  \\
 \hline
 Avg\_len                                       & 40        & 40           & 40         & 40         \\
 Std\_len                                       & 5         & 0            & 5          & 0          \\
@@ -375,6 +343,41 @@ RNN (TBC)                                & 5.73            & 7.27           & - 
 \caption{Quality and diversity metrics of model generations.}
 \label{tab:results}
 \end{table}
+
+\section{Experiments and evaluation}
+
+The evaluation of generated text is not a simple task.
+Some evaluations rely on intrinsic or extrinsic techniques.
+Within these techniques metrics such as n-gram overlap metrics (f-score, bleu, self-bleu, rouge, meteor),
+distance-based metrics, diversity metrics, content overlap metrics or even grammatical feature based
+are taken into account.
+Each metric reflects different results.
+For example, the self-bleu represents the diversity of the text \cite{texygen}.
+But this metrics are not perfect and can also be deceived.
+\cite{evaltextgen1} explains the different struggles these measures have.
+For example, it states that "a language model optimized only for perplexity
+may generate coherent but bland responses."
+In this sense, it is not simple to evaluate a text generator model based on a single metric.
+
+% Grid search explanation
+% Best model 1000 sents
+% Corpus Bleu, perplexity and rouge
+% Self-Bleu and n-Grams
+
+We have made a Grid Search to analyze the behavior of the generations with the variation of the parameters,
+and to choose the best combination of parameters for each one of the sampling methods. For each one of the
+combinations of parameters we have made five different generations each one with 500 text lines generated,
+then we calculated different measures to analyze the quality and the diversity of the generations like
+Corpus-Bleu on Wikitex-103 and TBC, rough and \%Unique-Ngrams. We select the three bests models for each
+generation method by means of comparing all the measures. Finally, we generated 1000 text lines with each one
+of the models, we evaluate the final generations and based on the results we choose the best combination of
+parameters for each model, in table \ref{tab:parameters} we report the parameters of each model.
+
+In table \ref{tab:parameters}, we report the Bleu scores with respect to WT103 and TBC for the best models we found,
+the results of the original paper \cite{wang2019bert}, the results of the original paper but evaluating the generated
+text with the Texygen library, and a RNN we trained on WT103.5 and TBC, in the following section we discuss more about
+the RNN model. It is possible to note that the proposed attention method is very near of the base line marked by the
+original paper, even outperforming the base line in the corpus-Bleu measure with respect to WT103.
 
 \subsection{Convergence of the attention sampling method}
 We have compared also the converge of the attention method with respect to the original sampling method (parallel).
