@@ -271,7 +271,7 @@ and the sampling method is not focus in only few parts of the sequence.
 %------------------------------------------------------------------------
 \subsection{Finetuning}
 BERT is a powerful model pre-trained on a broad set of text composed by the whole
-Wikipedia and Brown corpora \cite{bert}. %%BERT is trained on the BooksCorpus (800M words) and Wikipedia (2,500M words)
+Wikipedia and Brown corpora \cite{bert}. %%"BERT is trained on the BooksCorpus (800M words) and Wikipedia (2,500M words)"
 One of its main feature is its adaptability to a plethora of different tasks,
 by means of a fine-tuning on specific domain set.
 Typical fine-tuning techniques depends on the final task that the user requires BERT to perform.
@@ -282,7 +282,7 @@ of “next sentence prediction” and specifically designed for classification a
 Text generation is not a usual task for BERT.
 In this case, the fine-tuning aims to make the model understand the structure of the text,
 in order to mimic it at inference time.
-We have implemented a fine-tuning procedure that relies on \textit{Cloze} task present also in the original training [].
+We have implemented a fine-tuning procedure that relies on \textit{Cloze} task present also in the original training [].%% MML task: Masked Language Model
 This consists on replacing a percentage (15\% by default) of the tokens for each sentence with a [MASK] token and let
 BERT predict the blanks.
 The logits outputted by the model are then used to to compute the cross-entropy
@@ -352,6 +352,8 @@ But this metrics are not perfect and can also be deceived.
 For example, it states that "a language model optimized only for perplexity
 may generate coherent but bland responses."
 In this sense, it is not simple to evaluate a text generator model based on a single metric.
+
+
 
 % Grid search explanation
 % Best model 1000 sents
