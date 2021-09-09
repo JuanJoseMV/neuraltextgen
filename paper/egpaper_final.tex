@@ -271,72 +271,73 @@ and the sampling method is not focus in only few parts of the sequence.
 %------------------------------------------------------------------------
 \subsection{Finetuning}
 BERT is a powerful model pre-trained on a broad set of text composed by the whole
-Wikipedia and Brown corpora \cite{bert}. %%BERT is trained on the BooksCorpus (800M words) and Wikipedia (2,500M words)
+Wikipedia and Brown corpora.
 One of its main feature is its adaptability to a plethora of different tasks,
 by means of a fine-tuning on specific domain set.
 Typical fine-tuning techniques depends on the final task that the user requires BERT to perform.
 For example, considering classification tasks such as sentiment prediction and text classification,
 the fine-tuning will be focused on the [CLS] token, a special token used in the pre-training phase for the task
-of “next sentence prediction” and specifically designed for classification applications.
+of \textit{next-sentence-prediction} and specifically designed for classification applications.
 
 Text generation is not a usual task for BERT.
 In this case, the fine-tuning aims to make the model understand the structure of the text,
 in order to mimic it at inference time.
-We have implemented a fine-tuning procedure that relies on \textit{Cloze} task present also in the original training [].
+We have implemented a fine-tuning procedure that rely on \textit{Cloze} task, similar to the one adopted in the
+ original training \cite{wang2019bert}.
 This consists on replacing a percentage (15\% by default) of the tokens for each sentence with a [MASK] token and let
-BERT predict the blanks.
-The logits outputted by the model are then used to to compute the cross-entropy
+BERT predict the blanks. The logits outputted by the model are then used to to compute the cross-entropy
 loss with respect to the original token that were replaced.
+
 This method allows the final user to start from a pretrained model and fine-tune it on a specific
-text corpus in order then to make it generate text that similar to the original one.
+text corpus in order then to make it generate text similar to the original one.
 This approach also works  in the case that a pretrained model is not available in th language selected by the user.
 In this case, the user can simply start from a cross-language model [...]
 
-\subsubsection{Generation of text with a specific structure}
+\subsubsection{Structure of the text}
 The default vocabulary of the tokenizer contains around 1000 unused tokens, whose weights are randomly initialized.
 Typically, these tokens are replaced with domain specific words, so that during the fine-tuning phase
 the model will be able to learn their representation.
-
-We have extended this idea in order to comprehend also tokens that defines the structure of the text like '\textbackslash n' '\textbackslash t'.
-Note that, simply adding these tokens to the vocabulary or replacing with unused tokens would have no effect.
+We have extended this idea in order to comprehend also tokens that defines the structure of the text like
+'\textbackslash n' and '\textbackslash t'.
+Note that, simply adding these tokens to the vocabulary would have no effect.
 These tokens in fact, are typically replaced even before the tokenization, during the normalization step of the Tokenizer pipeline [].
-However, depending on the context, these tokens can be important. This can be especially true in the task of text generation.
+However, especially true in the task of text generation, these tokens can be really important .
 
-We have implemented a Formatter class that helps the user to format the text in order to preserve the important tokens.
+To solve this problem we have implemented a Formatter class that helps the user to format the text in order
+to preserve the important tokens.
 The Formatter replaces a user specified set of tokens that need to be preserved, with some unused-tokens.
 The replacement happens before the tokenization, in this manner, during the fine-tuning the model will be able to learn
-the position of these  tokens. The unused tokens are then replaced back with the original ones after the generation.
+the position of these important tokens.
+The unused tokens are then replaced back with the original ones after the generation.
 
-Using this method we were able to make a model learn the famous tercet structure of Dante's Divine Comedy \ref{}.
+Using this method we were able to fine-tune a model able to learn the famous tercet structure of Dante's Divine Comedy \ref{}.
 
 \subsubsection{Sentiment generation}
 \label{sentiment}
 An important aspect of BERT tokenizer are special tokens like [CLS], [MASK] and [SEP].
-As the name suggests, these are tokens with specific functions.
+As the name suggests, these are tokens with special functions.
 The tokenizer gave the possibility to define new special tokens.
-We have taken advantage of this, with the object of define a new method to generate text with a specific sentiment or label.
+We have taken advantage of this opportunity to define a new method to generate text with a specific sentiment or label.
 
-Considere a domain set $\mathcal S$ of sentences each one with an attached label $y\in \mathcal Y$, i.e.\ a text whose label-set are the two possible sentiments $\mathcal Y =\{pos, neg\}$.
+Consider a domain set $\mathcal S$ of sentences each one with an attached label $y\in \mathcal Y$, i.e.\ a text whose label-set are the two possible sentiments $\mathcal Y =\{pos, neg\}$.
 The method consists in three main steps:
 
 \begin{itemize}
 \item For each sentiment in the label set $y\in\mathcal Y$, we define $n$ (3 by default) special tokens $[y_i]\;\; for\;\;i=1,\ldots n$.
-In the case of $y=pos$ for example the set of special tokens will be $\{'\text{[pos-1]}', '\text{[pos-2]}, '\text{[pos-3]}'\}$
-\item Before the fine-tuning each sentence $s\in\mathcal S$ is tokenized, and the special tokens are appended at the beginning of the list of tokens.
+In the case of $y=pos$ for example the set of special tokens will be $\{\text{[pos-1]}, \text{[pos-2]}, \text{[pos-3]}\}$
+\item Before the fine-tuning each sentence $s\in\mathcal S$ is tokenized, and the special tokens corresponding to its label are appended at the beginning of the list of tokens.
 \item The fine-tuning is performed. During this step the model will build a relation among the special tokens of a sentiment and the specific words
 related to it.
 \item To generate the text with a given sentiment, the special tokens related to that sentiment are used as seed to create a context on top of which BERT can start generate.
-$$\begin{bmatrix}\end*{}
-   \begin*{}\underbrace{\text{[CLS]} \;\; \text{[pos-1]} \;\; \text{[pos-2]} \;\; \text{[pos-3]}}_{seed}&\end*{}
-   \begin*{}
-      \text{[MASK]} &\ldots
-   \end{bmatrix}
-   $$
 \end{itemize}
+$$\begin{bmatrix}\text{[CLS]} \end*{}
+   \begin*{}&\underbrace{ \;\; \text{[pos-1]} \;\; \text{[pos-2]} \;\; \text{[pos-3]}}_{seed}&\end*{}
+   \begin*{}
+      \text{[MASK]} &\text{[MASK]}&\ldots
+   \end{bmatrix}$$
 
 This method, even in its simplicity, showed its efficacy in generating positive and negative italian tweets about football.
 In addition, this method will allow the possibility to consider even more than two labels.
-
 %------------------------------------------------------------------------
 \section{Experiments and evaluation}
 
@@ -414,61 +415,159 @@ RNN (TBC)                                & 5.73            & 7.27           & - 
 \label{tab:results}
 \end{table}
 
+\subsection{Convergence of the attention sampling method}
+We have compared also the converge of the attention method with respect to the original sampling method (parallel).
+To do this we have run 80 generation experiments. Each sentence was initialized with a list of 25 [MASK] tokens and
+generation was runnign for 150 iterations. During each iteration we measured some statistics like the number of the
+iterations needed to replace the original [MASK]. This is an indicator of the speed at which the method is able to create
+a context for the sentence. Considering the original parallel method and the vanilla attention, in average more than 80
+iterations were required over 150. This means that the model had less than half the iterations to try to replace tokens
+with a complete sentence. Moreover the results showed a very high variability.
+On the other hand the attention method penalized showed a much faster replacement of the initial [MASK] tokens.
+\begin{figure}[t!]
+   \centering
+   \includegraphics[scale=0.3]{num_iter_replace_mask.png}
+   \caption{
+   }
+   \label{fig:ReplaceMask}
+\end{figure}
 
-\subsection{Italian generation: finetuning testing}
-In order to test the goodness of the fine-tuning implementation we have performed three experiments.
-All the experiments have been performed on Italian sets of text and for all the experiments we started from a pretrained
-italian BERT model, freely downloadable from huggingface [].
+This behavior reflects on a faster convergence of this method. We can see also in \ref{fig:Recall}
 
-%\subsubsection{Motivational quotes}
+\begin{figure}[t!]
+   \centering
+   \includegraphics[scale=0.4]{recall.png}
+   \caption{Average recall score of unigrams and bigrams w.r.t WikiText-103
+   at each iteration. The dashed lines correspond to the avg num of iterations needed
+   to replace the initial mask tokens}
+   \label{fig:Recall}
+\end{figure}
+
+\subsection{Italian generation: finetuning experiments}
+In order to test the goodness of the fine-tuning implementation we have performed three experiments. []
+All the experiments have been performed on Italian sets of text and for all the experiments we started from a
+pretrained italian BERT model
+%, freely downloadable from huggingface [].
+
 \paragraph{Motivational quotes} The first experiment aimed at showing the functionality of the fine-tuning method.
 To do that we have gathered a small set of motivational quotes.
 The set was constructed scraping from different sources, and the quotes were preprocessed in order to make them
-all structured in the same way.
+all structured in the same way:
 \begin{quote}
    A motivational quote - (anonymous)
 \end{quote}
 
-\paragraph{Dante's divine comedy} The second experiment was focused on the structure of the text, for this part we have used Dante's Divine Comedy.
+The results were quite surprising, the model was able to learn the structure of the quote (quote-dash-parentheses-author)
+and to generate some meaningful text. These are some example of the quotes generated:
 
+\begin{quote}
+   se vuoi davvero fare una cosa, e meglio se la smetti di farla. ( thomas edison )
+\end{quote}
+\begin{quote}
+non hai nulla da fare, tutti i giorni, se non stai cercando di fare tutto cio che e necessario. ( norman bates )
+\end{quote}
+\begin{quote}
+   quando muori, la vita finisce. non ci resta che aspettare finche non muori, perche non sai cosa ti aspetta ( anonimo )
+\end{quote}
+
+Obviously not all the quotes were this good. A lot of generation were stucked on repetitions of the same words or tokens.
+This is a common problem that we have found on all the generations with BERT that we have done.
+The sampling methods that outputted the most reliable quotes seemed to be the attention and the sequential.
+
+\paragraph{Dante's divine comedy} The second experiment was focused on the structure of the text,
+for this part we have used Dante's Divine Comedy. The model was fine-tuned on tercets (groups of three lines) instead of single lines.
 \begin{quote}
    Nel mezzo del cammin di nostra vita\\
    mi ritrovai per una selva oscura,\\
    ché la diritta via era smarrita.\\
-
-%   Ahi quanto a dir qual era è cosa dura\\
-%   esta selva selvaggia e aspra e forte\\
-%   che nel pensier rinova la paura!\\
 \end{quote}
-The model was fine-tuned on tercets (groups of three lines) instead of single lines.
-Moreover, we have replaced '\textbackslash n' with 'unused1' tokens in order to make BERT learn the structure of the tercets.
+Each tercet was preprocessed replacing '\textbackslash n' with 'unused1' tokens as explained in \ref{}.
+
+%\begin{quote}
+%['Nel', 'mezzo', 'del', 'cammin', 'di', 'nostra', 'vita', \textbf{'unused1'},
+% 'mi',
+% 'ritrovai',
+% 'per', \ldots
+%% 'una',
+%% 'selva',
+%% 'oscura,',
+%% \textbf{'unused1'},
+%% 'ché',
+%% 'la',
+%% 'diritta',
+%% 'via',
+%% 'era',
+%% 'smarrita.',
+%% \textbf{'unused1'}]
+%\end{quote}
 
 \begin{quote}
-['Nel', 'mezzo', 'del', 'cammin', 'di', 'nostra', 'vita', \textbf{'unused1'},
- 'mi',
- 'ritrovai',
- 'per', \ldots
-% 'una',
-% 'selva',
-% 'oscura,',
-% \textbf{'unused1'},
-% 'ché',
-% 'la',
-% 'diritta',
-% 'via',
-% 'era',
-% 'smarrita.',
-% \textbf{'unused1'}]
+ che mai non m ’ io coglia ;\\
+ e non abbracci che li si ridesse,\\
+ che piu tempo fece prodente.\\
+
+
+ ma vidi io di lo vento che\\
+ del son s ’ accesi io :\\
+ per tanto piacer che questo venisse il triscio ».\\
+
+
+ ma gia di queste le zanne\\
+ sonn piu, si malicce,\\
+ che prima l ’ occhio non era in ciel ;\\
+
 \end{quote}
 
-\paragraph{Sentiment generation} The aim of the third experiment was the sentiment generation.
-In this case we have used a dataset [] composed by num italian tweets.
+%\begin{quote}
+%
+%e disse a me : ‘ e tu? ’\\
+%piu in la che vidi, piu non si facea ;\\
+%questo e ’ l padre mio, che e con me ».\\
+%
+%e cato e cato, e in lui\\
+%si fece ’ l uno e un altro,\\
+%si che ’ l le membra e lo spirito movea ».\\
+%
+%sappi pero che la tua mente e buona,\\
+%che si fa la volonta di dio,\\
+%com ’ e stata fatta l ’ arte del mondo,\\
+%che non e morta.\\
+%
+%“ e ’ l viso mio “ chinato ”,\\
+%e ’ l vidi correr dietro a me\\
+%si tentenno e disse : « loco, loco! ».\\
+%\end{quote}
+
+All the '\textbackslash n' tokens present in the quote were automatically generated by the model.
+Also in this case the attention sampling method seemed the one able to reproduce the structure in the best way.
+
+
+\paragraph{Sentiment generation} In this case we have used a dataset [] composed by num italian tweets.
 Each tweet has associated a sentiment score for each one of 4 possible labels
 $\mathcal Y = \{\text{POSITIVE}, \text{NEGATIVE}, \text{MIXED}, \text{NEUTRAL}\}$ and a sentiment label corresponding
-to the sentiment with the highset score. 
+to the sentiment with the highest score.
 The dataset was highly imbalanced, with respect to the last two classes, so we have considered only the first two.
-The dataset was preprocessed as explained in \ref{sentiment}; in addition a set of tokens was added in order to deal
-with '@tags' and '#hashtags'.
+The dataset was preprocessed as explained in \ref{sentiment}; in addition a set of tokens was added to the vocabulary
+in order to deal with '@tags' and '#hashtags'.
+%\begin{quote}
+%   [POSITIVE] Nonostante l'odio sportivo verso la @juventusfc, che grande colpo portare @Cristiano in @SerieA\_TIM! Spero il @sscnapoli risponda a questo colpo!
+%\end{quote}
+%\begin{quote}
+%   [NEGATIVE] #FranciaVsArgentina #FifaWorldCup2018 @mascherano è un giocatore che mi è sempre piaciuto ma che mi sembra ormai improponibile a questi livelli
+%\end{quote}
+[POSITIVE]:
+\begin{quote}
+   ronaldo tante complimenti per per il tuo bellissimo debutto, dopo aver visto il tuo punto forza e auguri @\_/juventusfc #juventusfc #juventusfc?
+\end{quote}
+
+[NEGATIVE]:
+\begin{quote}
+   ronaldo??? molto bene? molto bene??? non si vince mai con sportivita e fiducia non ti preoccupare hai dimostrato di non poter faticare a nulla
+\end{quote}
+\begin{quote}
+   ronaldo @movaro\_jr siamo tutti pieni di professionalita e fantasia, ma ora e il momento di scegliere un altro giocatore, prima di redimere questa partita
+\end{quote}
+
 
 
 
