@@ -6,6 +6,8 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{svg}
+
 \usepackage{mathrsfs}
 
 \usepackage{cite}
@@ -238,7 +240,7 @@ BERT is a powerful model pre-trained on a broad set of text composed by the whol
 Wikipedia and Brown corpora.
 One of its main feature is its adaptability to a plethora of different tasks,
 by means of a fine-tuning on specific domain set.
-Typical fine-tuning techniques depends on the final task that the user requires BERT to perform.
+Typical fine-tuning techniques depend on the final task that the user requires BERT to perform.
 For example, considering classification tasks such as sentiment prediction and text classification,
 the fine-tuning will be focused on the [CLS] token, a special token used in the pre-training phase for the task
 of \textit{next-sentence-prediction} and specifically designed for classification applications.
@@ -246,10 +248,10 @@ of \textit{next-sentence-prediction} and specifically designed for classificatio
 Text generation is not a usual task for BERT.
 In this case, the fine-tuning aims to make the model understand the structure of the text,
 in order to mimic it at inference time.
-We have implemented a fine-tuning procedure that rely on \textit{Cloze} task, similar to the one adopted in the
+We have implemented a fine-tuning procedure that relies on a \textit{Cloze} task, similar to the one adopted in the
  original training \cite{wang2019bert}.
 This consists on replacing a percentage (15\% by default) of the tokens for each sentence with a [MASK] token and let
-BERT predict the blanks. The logits outputted by the model are then used to to compute the cross-entropy
+BERT predict the blanks. The logits outputted by the model are then used to compute the cross-entropy
 loss with respect to the original token that were replaced.
 
 This method allows the final user to start from a pretrained model and fine-tune it on a specific
@@ -261,11 +263,11 @@ In this case, the user can simply start from a cross-language model [...]
 The default vocabulary of the tokenizer contains around 1000 unused tokens, whose weights are randomly initialized.
 Typically, these tokens are replaced with domain specific words, so that during the fine-tuning phase
 the model will be able to learn their representation.
-We have extended this idea in order to comprehend also tokens that defines the structure of the text like
+We have extended this idea in order to comprehend also tokens that define the structure of the text like
 '\textbackslash n' and '\textbackslash t'.
 Note that, simply adding these tokens to the vocabulary would have no effect.
 These tokens in fact, are typically replaced even before the tokenization, during the normalization step of the Tokenizer pipeline [].
-However, especially true in the task of text generation, these tokens can be really important .
+However, these tokens can be really important, especially in the task of text generation.
 
 To solve this problem we have implemented a Formatter class that helps the user to format the text in order
 to preserve the important tokens.
@@ -284,7 +286,7 @@ The tokenizer gave the possibility to define new special tokens.
 We have taken advantage of this opportunity to define a new method to generate text with a specific sentiment or label.
 
 Consider a domain set $\mathcal S$ of sentences each one with an attached label $y\in \mathcal Y$, i.e.\ a text whose label-set are the two possible sentiments $\mathcal Y =\{pos, neg\}$.
-The method consists in three main steps:
+The method consists of three main steps:
 
 \begin{itemize}
 \item For each sentiment in the label set $y\in\mathcal Y$, we define $n$ (3 by default) special tokens $[y_i]\;\; for\;\;i=1,\ldots n$.
@@ -292,8 +294,9 @@ In the case of $y=pos$ for example the set of special tokens will be $\{\text{[p
 \item Before the fine-tuning each sentence $s\in\mathcal S$ is tokenized, and the special tokens corresponding to its label are appended at the beginning of the list of tokens.
 \item The fine-tuning is performed. During this step the model will build a relation among the special tokens of a sentiment and the specific words
 related to it.
-\item To generate the text with a given sentiment, the special tokens related to that sentiment are used as seed to create a context on top of which BERT can start generate.
 \end{itemize}
+To generate the text with a given sentiment, the special tokens related to that sentiment are used as a seed to create
+a context on top of which BERT can start to generate.
 $$\begin{bmatrix}\text{[CLS]} \end*{}
    \begin*{}&\underbrace{ \;\; \text{[pos-1]} \;\; \text{[pos-2]} \;\; \text{[pos-3]}}_{seed}&\end*{}
    \begin*{}
@@ -383,14 +386,15 @@ original paper, even outperforming the base line in the corpus-Bleu measure with
 We have compared also the converge of the attention method with respect to the original sampling method (parallel).
 To do this we have run 80 generation experiments. Each sentence was initialized with a list of 25 [MASK] tokens and
 generation was runnign for 150 iterations. During each iteration we measured some statistics like the number of the
-iterations needed to replace the original [MASK]. This is an indicator of the speed at which the method is able to create
+iterations needed to replace all the original [MASK] tokens. This is an indicator of the speed at which the method is able to create
 a context for the sentence. Considering the original parallel method and the vanilla attention, in average more than 80
 iterations were required over 150. This means that the model had less than half the iterations to try to replace tokens
 with a complete sentence. Moreover the results showed a very high variability.
 On the other hand the attention method penalized showed a much faster replacement of the initial [MASK] tokens.
 \begin{figure}[t!]
    \centering
-   \includegraphics[scale=0.3]{num_iter_replace_mask.png}
+   \includesvg{test.svg}
+%   \includegraphics[scale=0.3]{test.svg}
    \caption{
    }
    \label{fig:ReplaceMask}
@@ -512,13 +516,8 @@ $\mathcal Y = \{\text{POSITIVE}, \text{NEGATIVE}, \text{MIXED}, \text{NEUTRAL}\}
 to the sentiment with the highest score.
 The dataset was highly imbalanced, with respect to the last two classes, so we have considered only the first two.
 The dataset was preprocessed as explained in \ref{sentiment}; in addition a set of tokens was added to the vocabulary
-in order to deal with '@tags' and '#hashtags'.
-%\begin{quote}
-%   [POSITIVE] Nonostante l'odio sportivo verso la @juventusfc, che grande colpo portare @Cristiano in @SerieA\_TIM! Spero il @sscnapoli risponda a questo colpo!
-%\end{quote}
-%\begin{quote}
-%   [NEGATIVE] #FranciaVsArgentina #FifaWorldCup2018 @mascherano è un giocatore che mi è sempre piaciuto ma che mi sembra ormai improponibile a questi livelli
-%\end{quote}
+in order to deal with '@tags' and '#hashtags'.\\
+
 [POSITIVE]:
 \begin{quote}
    ronaldo tante complimenti per per il tuo bellissimo debutto, dopo aver visto il tuo punto forza e auguri @\_/juventusfc #juventusfc #juventusfc?
@@ -528,15 +527,32 @@ in order to deal with '@tags' and '#hashtags'.
 \begin{quote}
    ronaldo??? molto bene? molto bene??? non si vince mai con sportivita e fiducia non ti preoccupare hai dimostrato di non poter faticare a nulla
 \end{quote}
-\begin{quote}
-   ronaldo @movaro\_jr siamo tutti pieni di professionalita e fantasia, ma ora e il momento di scegliere un altro giocatore, prima di redimere questa partita
-\end{quote}
-
-
 
 
 %-------------------------------------------------------------------------
 \section{Conclusions}
+In this project we explored the usage of BERT as a text generator,
+focusing in particular on the sampling methods.
+Our new attention method was able to reach the results obtained in the original paper
+improving the convergence time, and the number of iterations needed.
+
+Anyway as in the original paper, the results of BLEU score on the generation of a wide body of text
+showed the unreliability of BERT in text generation, due to incapacity of controlling the generation.
+In particular, a typical problem that we have encountered during the generation was that in
+a considerable number of iterations the model was stuck in a bad part of the
+configuration space i.e. all '.' tokens or repetition of groups of tokens.
+The consequence was that BERT was keeping replacing the tokens with the same ones until the last iteration.
+
+Nonetheless, our experiments showed the possibility to still apply the model
+on specific domains i.e quotes, through a fine-tuning.
+In this case, BERT were able to clearly understand
+the structure and generate some meaningful text.
+
+Due to high variability of the results, we can conclude that no sampling method was clearly
+outperforming the others. This suggests the possibility of future exploration in other parts
+of the generation method. In particular it could be interesting a further investigation
+of the resampling part and the implementation of a scheduling of the temperature of the logits,
+in order to help the generation method to not get stuck in the early stages of the generation.
 
 \bibliographystyle{ieeetr}
 \bibliography{egbib}
