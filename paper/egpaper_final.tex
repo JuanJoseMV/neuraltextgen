@@ -74,7 +74,7 @@ should read this new version.
 
 In recent years, the field of Natural Language Generation (NLG) has expanded its repertoire
 of solutions for text generation to include a variety of methods.
-Models such as RNN's, Bi-LSTM [*], Transformers-based models (e.g.\ GPT [*]), GAN's, among others, have evolved
+Models such as RNN's, Bi-LSTM, Transformers-based models (e.g.\ GPT), GAN's, among others, have evolved
 to produce elaborate pieces of text for different specifics tasks.
 Each method proposes a different approach to the task at hand.
 
@@ -83,9 +83,9 @@ Each method proposes a different approach to the task at hand.
 Recurrent Neural Networks (RNN) are commonly used in sequence-to-sequence (seq2seq) tasks, such as text generation.
 Simple RNN's have been adapted to overcome its own limitations, e.g.\ vanishing or exploding gradients,
 introducing concepts such as Long Short Term Memory networks (LSTM) or even bidirectional LSTM's (Bi-LSTM).
-Bi-LSTM have been used in many cases for text generation [*] improving its performance in some cases [*].
-These models are still used in recent years for text generation in different languages [*].
-Some studies [*] use external word embeddings for the training process which can be seen as pre-trained
+LSTM's and Bi-LSTM have been used in many cases for text generation \cite{Bengali} \cite{lstm1} \cite{lstm2} \cite{lstm3}.
+These models are still used in recent years.
+Some studies \cite{embedds} use external word embeddings for the training process which can be seen as pre-trained
 models for text generation.
 
 In this work, we train a simple RNN with an Embedding layer, one LSTM module and a dense output layer.
@@ -98,13 +98,13 @@ With this configuration, 1000 sentences were generated for comparison with alter
 
 \subsection{Transformers}
 
-With the introduction of [*], new models for text generations task have arisen.
-[*] introduces an Encoder-Decoder based architecture for machine translation tasks.
-This architecture was ingeniously modified by [*] and [*] to yield models such as BERT and GPT.
+With the introduction of \cite{attention}, new models for text generations task have arisen.
+\cite{attention} introduces an Encoder-Decoder based architecture for machine translation tasks.
+This architecture was ingeniously modified by \cite{bert} and \cite{gpt} to yield models such as BERT and GPT.
 Both Generative Pre-trained Transformer (GPT) and Bidirectional Encoder Representations from Transformers (BERT)
 are based on the idea of transformers and can be finetuned and adapted for a variety of tasks [***].
 These models have slowly replaced the RNN approaches.
-As [*ModernMethodsOfTextGeneration] states: "Transformers disrupted sequence-based deep learning significantly.
+As \cite{modernMethods} states: "Transformers disrupted sequence-based deep learning significantly.
 The two variants of transformer models that we showed, BERT and GPT-2, outperform
 previous approaches with RNNs".
 
@@ -130,9 +130,9 @@ indicated model for text generation tasks.
 However, \cite{wang2019bert} have demonstrated why it is possible to use BERT as a traditional
 language model by means of showing that BERT is a combination of a 'Markov random field
 language model (MRF-LM), with pseudo Log-Likelihood training'.
-
 This conclusion allows using BERT as a generative model of sentences to either score a sentence or
 sample a sentence.
+
 To generate text with BERT the process is composed by 3 main steps described as follows and illustrated in the Figure \ref{fig:BertFig}:
 
 \begin{itemize}
@@ -146,8 +146,8 @@ they propose three different methods to carry out the sampling, these methods ar
    \item Parallel sequential: The sequence is masked choosing at random one token at each iteration.
 \end{itemize}
 \item Replacement: Finally, the sequence with the masked token is passed to BERT to produce a tensor of logits $L$ of
-the length of its vocabulary $v (v \approx 30K)$, the logits are interpreted as a probability distribution of how related
-are each one of the tokens in the BERT vocabulary with the current sequence, finally the logits are normalized by using a
+the length of its vocabulary $v (v \approx 30K)$. The logits are interpreted as a probability distribution of how related
+are each one of the tokens in the BERT vocabulary with the current sequence. Finally, the logits are normalized using a
 softmax function to retrieve the probability of each token to be inserted on the sequence and based on this probability
 the new token is selected.
 \end{itemize}
@@ -245,7 +245,7 @@ and the sampling method is not focus in only few parts of the sequence.
 %------------------------------------------------------------------------
 \subsection{Finetuning}
 BERT is a powerful model pre-trained on a broad set of text composed by the whole
-Wikipedia and Brown corpora [].
+Wikipedia and Brown corpora \cite{bert}. %%BERT is trained on the BooksCorpus (800M words) and Wikipedia (2,500M words)
 One of its main feature is its adaptability to a plethora of different tasks,
 by means of a fine-tuning on specific domain set.
 Typical fine-tuning techniques depends on the final task that the user requires BERT to perform.
@@ -256,9 +256,10 @@ of “next sentence prediction” and specifically designed for classification a
 Text generation is not a usual task for BERT.
 In this case, the fine-tuning aims to make the model understand the structure of the text,
 in order to mimic it at inference time.
-We have implemented a fine-tuning procedure that rely on \textit{Cloze} task present also in the original training [].
+We have implemented a fine-tuning procedure that relies on \textit{Cloze} task present also in the original training [].
 This consists on replacing a percentage (15\% by default) of the tokens for each sentence with a [MASK] token and let
-BERT predict the blanks. The logits outputted by the model are then used to to compute the cross-entropy
+BERT predict the blanks.
+The logits outputted by the model are then used to to compute the cross-entropy
 loss with respect to the original token that were replaced.
 This method allows the final user to start from a pretrained model and fine-tune it on a specific
 text corpus in order then to make it generate text that similar to the original one.
@@ -313,10 +314,25 @@ In addition, this method will allow the possibility to consider even more than t
 %------------------------------------------------------------------------
 \section{Experiments and evaluation}
 
-Grid search explanation
-Best model 1000 sents
-Corpus Bleu, perplexity and rouge
-Self-Bleu and n-Grams
+The evaluation of generated text is not a simple task.
+Some evaluations rely on intrinsic or extrinsic techniques.
+Within these techniques metrics such as n-gram overlap metrics (f-score, bleu, self-bleu, rouge, meteor),
+distance-based metrics, diversity metrics, content overlap metrics or even grammatical feature based
+are taken into account.
+Each metric reflects different results.
+For example, the self-bleu represents the diversity of the text \cite{texygen}.
+But this metrics are not perfect and can also be deceived.
+\cite{evaltextgen1} explains the different struggles these measures have.
+For example, it states that "a language model optimized only for perplexity
+may generate coherent but bland responses."
+In this sense, it is not simple to evaluate a text generator model based on a single metric.
+
+% Grid search explanation
+% Best model 1000 sents
+% Corpus Bleu, perplexity and rouge
+% Self-Bleu and n-Grams
+
+
 \begin{table}[]
 \begin{tabular}{lllll}
 \hline
