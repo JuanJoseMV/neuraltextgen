@@ -66,11 +66,29 @@ our contributions.
 %%%%%%%%% BODY TEXT
 \section{Introduction}
 
-Please follow the steps outlined below when submitting your manuscript to
-the IEEE Computer Society Press.  This style guide now has several
-important modifications (for example, you are no longer warned against the
-use of sticky tape to attach your artwork to the paper), so all authors
-should read this new version.
+In recent years, the field of text generation has become an ever-growing interest
+with the advent of new methods for generating text. Pre-trained language models
+such as BERT have been used for a variety of NLP tasks. Taking advantage of BERT’s
+MML task, [] has proposed to use BERT as a text generator. In this project,
+we analyse the ways in which BERT can generate sentences by taking advantage of its
+architecture. Firstly, we describe three steps for the generation process: initialization,
+sampling and replacement. Within this process we propose a different approach for the
+sampling part, utilizing BERT’s attention mechanism to select at each iteration the most
+appropriate tokens to be replaced by the model. A penalised attention mechanism is
+introduced to overcome the difficulties of the model to select some tokens more frequently
+than others for replacement.
+
+Having a working BERT-based model to generate text we perform a fine-tuning of the model
+to extend its abilities to generate Italian text. In this way, it was possible to have the
+model learn the structure of Italian poetry, generate tweets and motivational quotes.
+Another proposal on how to extend the model abilities, consist of adapting the model in
+the training phase so that it can generate text according to a specified sentiment
+(e.g., generate positive tweets).
+
+The evaluation of machine generate text is a complicated task, having different metrics
+to represent the goodness of the writing. In this work, we compare the results of the Bleu
+score with the results of [] and discuss the efficiency of the introduced attention
+mechanism.
 
 %-------------------------------------------------------------------------
 \section{Current methods}
