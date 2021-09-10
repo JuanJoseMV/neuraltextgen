@@ -30,7 +30,7 @@
 \begin{document}
 
 %%%%%%%%% TITLE
-\title{\LaTeX\ Author Guidelines for CVPR Proceedings}
+\title{Improving BERT text generation with an attention sampling method}
 
 \author{First Author\\
 Institution1\\
@@ -248,7 +248,7 @@ and the sampling method is not focus in only few parts of the sequence.
 %------------------------------------------------------------------------
 \subsection{Finetuning}
 BERT is a powerful model pre-trained on a broad set of text composed by the whole
-BooksCorpus and Wikipedia corpora.
+BooksCorpus and Wikipedia corpora \cite{wang2019bert}.
 One of its main feature is its adaptability to a plethora of different tasks,
 by means of a fine-tuning on specific domain set.
 Typical fine-tuning techniques depend on the final task that the user requires BERT to perform.
@@ -260,7 +260,7 @@ Text generation is not a usual task for BERT.
 In this case, the fine-tuning aims to make the model understand the structure of the text,
 in order to mimic it at inference time.
 We have implemented a fine-tuning procedure that relies on a \textit{Cloze} task, similar to the one adopted also in the
- original training \cite{wang2019bert}.
+ original training \cite{bert}.
 This consists on replacing a percentage (15\% by default) of the tokens for each sentence with a [MASK] token and let
 BERT predict the blanks. The logits outputted by the model are then used to compute the cross-entropy
 loss with respect to the original token that were replaced.
@@ -268,7 +268,8 @@ loss with respect to the original token that were replaced.
 This method allows the final user to start from a pretrained model and fine-tune it on a specific
 text corpus in order then to make it generate text similar to the original one.
 This approach also works  in the case that a pretrained model is not available in th language selected by the user.
-In this case, the user can simply start from a Multilingual Models and apply the so called Cross-Lingual Transfer Learning.
+In this case, the user can simply start from a Multilingual Models and applying a process referred to as 
+Cross-Lingual Transfer Learning\cite{crosslanguage}.
 
 \subsubsection{Structure of the text}
 \label{section:structureText}
@@ -281,7 +282,6 @@ Note that, simply adding these tokens to the vocabulary would have no effect.
 These tokens in fact, are typically replaced even before the tokenization, during the normalization step of the tokenization pipeline.
 
 However, these tokens can be really important, especially in the task of text generation.
-
 To solve this problem we have implemented a Formatter class that helps the user to format the text in order
 to preserve the important tokens.
 The Formatter replaces a user specified set of tokens that need to be preserved, with some unused-tokens.
@@ -311,11 +311,8 @@ related to it.
 \end{itemize}
 To generate the text with a given sentiment, the special tokens related to that sentiment are used as a seed to create
 a context on top of which BERT can start to generate.
-$$\begin{bmatrix}\text{[CLS]} \end*{}
-   \begin*{}&\underbrace{ \;\; \text{[pos-1]} \;\; \text{[pos-2]} \;\; \text{[pos-3]}}_{seed}&\end*{}
-   \begin*{}
-      \text{[MASK]} &\text{[MASK]}&\ldots
-   \end{bmatrix}$$
+$$\big[     \text{[CLS]}\quad\underbrace{ \;\; \text{[pos-1]} \;\; \text{[pos-2]} \;\; \text{[pos-3]}}_{seed}
+      \quad      \text{[MASK]} \quad\text{[MASK]}\quad\ldots$$
 
 This method, even in its simplicity, showed its efficacy in generating positive and negative italian tweets about football.
 In addition, this method will allow the possibility to consider even more than two labels.
@@ -405,7 +402,7 @@ of iterations needed to replace all the starting [MASK] tokens \ref{fig:ReplaceM
 This is an indicator of the speed at which the method is able to create a context for the sentence.
 The parallel and the vanilla attention methods, required in average more than 80 over 150 iterations.
 This means that the model had less than 70 remaining iterations to try to replace tokens with a complete sentence.
-Moreover they showed a very high variability.
+Moreover, they showed a very high variability.
 On the other hand the penalized attention method showed a much faster replacement with a lower variability.
 
 \begin{figure}[t!]
@@ -435,7 +432,9 @@ one able to reach it faster.
 \subsection{Italian generation: finetuning experiments}
 In order to test the functionality of the fine-tuning we have performed three experiments
 \footnote[1]{https://github.com/JuanJoseMV/neuraltextgen/blob/main/Example\_finetuning.ipynb}.
-All the experiments were performed with an italian pretrained BERT model applied on Italian sets of text.
+All the experiments were performed with an italian pretrained BERT model
+\footnote[2]{https://huggingface.co/dbmdz/bert-base-italian-cased}
+applied on Italian sets of text.
 All the fine-tunings use the AdamW optimizer with linear schedule with warmup, as common use for finetuning transformer methods.
 
 \paragraph{Motivational quotes} In the first experiment we have gathered a small set of motivational quotes,
@@ -445,7 +444,7 @@ all structured in the same way:
    A motivational quote - (anonymous)
 \end{quote}
 
-The model was finetuned for 2 epochs with starting $lr=5e^{-5}$. The results were quite surprising,
+The model was finetuned for 4 epochs with starting $lr=5e^{-5}$. The results were quite surprising,
 the model was able to learn the structure of the quote and to generate some meaningful text.
 This is an example:
 
@@ -471,7 +470,7 @@ The model was fine-tuned on tercets (groups of three lines) instead of single li
    ché la diritta via era smarrita.\\
 \end{quote}
 Each tercet was preprocessed replacing '\textbackslash n' with 'unused1' tokens as explained in \ref{section:structureText}.
-
+Also in this case the model was finetuned for 4 epochs with starting $lr=5e^{-5}$. These are 2 tercets generated:
 %\begin{quote} %['Nel', 'mezzo', 'del', 'cammin', 'di', 'nostra', 'vita', \textbf{'unused1'}, % 'mi', % 'ritrovai', % 'per', \ldots%% 'una',%% 'selva',
 %% 'oscura,', %% \textbf{'unused1'}, %% 'ché',%% 'la',%% 'diritta',%% 'via',%% 'era',%% 'smarrita.',%% \textbf{'unused1'}]%\end{quote}
 
@@ -522,15 +521,15 @@ Also in this case the attention sampling method seemed the one able to reproduce
 
 
 \paragraph{Sentiment generation} In this case we have used a dataset
-composed by 12000 italian tweets extracted from \ref{}.
-Each tweet hw associated a sentiment score for each one of 4 possible labels
-$\mathcal Y = \{\text{POSITIVE}, \text{NEGATIVE}, \text{MIXED}, \text{NEUTRAL}\}$
-and a sentiment label corresponding to the highest score.
+composed by 12000 italian tweets extracted from
+\footnote[1]{https://github.com/charlesmalafosse/open-dataset-for-sentiment-analysis}.
+Each tweet with one of 4 possible sentimen labels
+$\mathcal Y = \{\text{POSITIVE}, \text{NEGATIVE}, \text{MIXED}, \text{NEUTRAL}\}$.
 The dataset was highly imbalanced with respect to the last two classes, so we have considered only the first two
 selecting 6000 tweets for each one.
 The dataset was preprocessed as explained in \ref{sentiment}; in addition a set of tokens was added to the vocabulary
-in order to deal with '@tags' and '#hashtags'. We have generated, setting [POSITIVE]/[NEGATIVE] + "Ronaldo"
-as seed:
+in order to deal with '@tags' and '#hashtags'. We have generated new tweets, setting [POSITIVE]/[NEGATIVE] + "Ronaldo"
+as starting seed:\\
 
 [POSITIVE]:
 \begin{quote}
@@ -542,6 +541,7 @@ as seed:
    ronaldo??? molto bene? molto bene??? non si vince mai con sportivita e fiducia non ti preoccupare hai dimostrato di non poter faticare a nulla
 \end{quote}
 
+Other example of the generations can be found on the Appendix \ref{sec:appendix}.
 
 \section{Conclusions}
 In this project we explored the usage of BERT as a text generator,
@@ -568,7 +568,9 @@ outperforming the others. This suggests the possibility of future exploration in
 of the generation method. In particular it could be interesting a further investigation
 of the resampling part and the implementation of a scheduling of the temperature of the logits,
 in order to help the generation method to not get stuck in the early stages of the generation.
+
 \bibliographystyle{ieeetr}
 \bibliography{egbib}
 
+\section*{Appendix}\label{sec:appendix}
 \end{document}
