@@ -161,11 +161,8 @@ To generate text with BERT the process is composed by 3 main steps described as 
 \item Initialization: It is necessary to initialize the sequence with a random initial state, this can be either an all-mask sequence,
 i.e.([MASK], ...,[MASK]), an all-random sequence, or a combination of these, i.e. (50\% [MASK] tokens and 50\% random tokens).
 \item Sampling: At each iteration, it is necessary to choose which token of the sequence will be masked, in \cite{wang2019bert}
-they propose two different methods to carry out the sampling, these methods are described as follows:
-\begin{itemize}
-   \item Sequential: The sequence is masked from left to right one token at a time at each iteration.
-   \item Parallel sequential: The sequence is masked choosing at random one token at each iteration.
-\end{itemize}
+they propose the Sequential sampling in which the sequence is masked from left to right one token at a time at each iteration,
+and the Parallel sequential sampling in which the sequence is masked choosing at random one token at each iteration.
 \item Replacement: Finally, the sequence with the masked token is passed to BERT to produce a tensor of logits $L$ of
 the length of its vocabulary $v (v \approx 30K)$. Those are interpreted as the probability of the token to be present in the current sequence.
 Finally, the logits are normalized using a SoftMax function to get a probability distribution and select the new token to be inserted.
@@ -176,12 +173,12 @@ made once for each iteration of the model.
 
 In \cite{wang2019bert} they use a set of parameters to set up the generations,
 we add a new set of parameters to make easier the use of the model and
-to include some new functionalities to the sampling. We insert a way to
-change the composition of the initial state with the parameter Init_mask_prob.
-We make easier to change the generation method with the parameter generation_method.
-We introduce a way to create sentences with different length in one generation with the parameters Max_len,
-min_len, avg_len and std_len. Finally, we add the possibility to mask and replace more
-than one token for each sentence at each iteration with the parameter masked_portion.
+to include some new functionalities. We insert a way to
+change the composition of the initial state with the parameter $init\_mask\_prob$.
+We make easier to change the generation method with the parameter $generation\_method$.
+We introduce a way to create sentences with different length in one generation with the parameters $Max\_len,
+Min\_len, Avg\_len and Std\_len$. Finally, we add the possibility to mask and replace more
+than one token for each sentence at each iteration with the parameter $masked\_portion$.
 
 %------------------------------------------------------------------------
 \subsection{Attention mechanism}
@@ -233,25 +230,16 @@ to those tokens that were chosen several times, in that way the sampling method 
 exploration of the sequence based on the attention information and as a result we get better
 generations.
 
-below we describe the procedure to develop the sampling method in the iteration $t$:
+To carry it out we retrieve the attention masks of the iteration $t-1$ ($a$), then get the average value of
+the attention masks ($A_{p,e}$) for each position $p$ inside each one of the encoders $e$. subsequently, we get
+the average value of the attention masks ($totalA_{p}$) for each position over all the encoders.
+In this way, we reach to summarize all the attention information in only one tensor.
+afterward, for each position $p$, we set a counter $c$ that registers how many times the position $p$ has been selected to be replaced.
+Next, we divide the average value of the attention masks ($totalA_{p}$) by the counter $c$.
+This step is useful to avoid that the sampling method gets stuck sampling always the same positions.
+Finally, we normalize the result to get a probability distribution $P$ and we sample randomly from it the new token to be replaced.
 
-\begin{itemize}
-\item Step 1: Retrieve the attention masks of the iteration $t-1$ ($a$), then get the average value of the attention masks $A_{p,e}$ for each position $p$ inside each one of the encoders $e$.
-\item Step 2: Get the average value of the attention mask $totalA_{p}$ for each position over all the encoders.
-\item Step 3: For each position $p$, there is a counter $c$ that register how many times the position $p$ has been selected to be replaced.
-\item Step 4: The average value of the attention masks $totalA_{p}$ is divided by the counter $c$ to create a penalization.
-\item Step 5: Normalize the result of the step 4 to get a probability distribution $P$.
-\item Step 6: Sample randomly with distribution $P$ the new token to be replaced.
-\end{itemize}
-
-In the step 1 we summarize the information of the attention inside each one of the encoders,
-then in the step 2 we combine the information of the different encoders to obtain a single
-measure of the attention, the step 3 set a counter,the step 4 is useful to help the method to avoid that the sampling
-method get stuck sampling always the same positions given its strong relation with the current
-context, finally the steps 5 and 6 creates a probability distribution based on the penalized attention
-and sample the new token to be replaced.
-
-Finally, in the Figure \ref{fig:AttentComp} it is possible to see how the probability of choose a token evolves
+In the Figure \ref{fig:AttentComp} it is possible to see how the probability of choose a token evolves
 during the iterations, it is possible to note how the attention method
 get stuck during several iterations in the same areas of the sequence, for example, during the iterations
 10 to 16, the probability was focus on the last 4 tokens of the sequence.
