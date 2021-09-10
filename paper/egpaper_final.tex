@@ -174,6 +174,15 @@ Finally, the logits are normalized using a SoftMax function to get a probability
 The initialization is made only once at the beginning of the generation process, the sampling and the replacing are
 made once for each iteration of the model.
 
+In \cite{wang2019bert} they use a set of parameters to set up the generations,
+we add a new set of parameters to make easier the use of the model and
+to include some new functionalities to the sampling. We insert a way to
+change the composition of the initial state with the parameter Init_mask_prob.
+We make easier to change the generation method with the parameter generation_method.
+We introduce a way to create sentences with different length in one generation with the parameters Max_len,
+min_len, avg_len and std_len. Finally, we add the possibility to mask and replace more
+than one token for each sentence at each iteration with the parameter masked_portion.
+
 %------------------------------------------------------------------------
 \subsection{Attention mechanism}
 The attention mechanism is composed by a feed forward neural network that is trained to
