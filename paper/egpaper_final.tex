@@ -161,16 +161,14 @@ To generate text with BERT the process is composed by 3 main steps described as 
 \item Initialization: It is necessary to initialize the sequence with a random initial state, this can be either an all-mask sequence,
 i.e.([MASK], ...,[MASK]), an all-random sequence, or a combination of these, i.e. (50\% [MASK] tokens and 50\% random tokens).
 \item Sampling: At each iteration, it is necessary to choose which token of the sequence will be masked, in \cite{wang2019bert}
-they propose three different methods to carry out the sampling, these methods are described as follows:
+they propose two different methods to carry out the sampling, these methods are described as follows:
 \begin{itemize}
    \item Sequential: The sequence is masked from left to right one token at a time at each iteration.
    \item Parallel sequential: The sequence is masked choosing at random one token at each iteration.
 \end{itemize}
 \item Replacement: Finally, the sequence with the masked token is passed to BERT to produce a tensor of logits $L$ of
-the length of its vocabulary $v (v \approx 30K)$. The logits are interpreted as a probability distribution of how related
-are each one of the tokens in the BERT vocabulary with the current sequence. Finally, the logits are normalized using a
-softmax function to retrieve the probability of each token to be inserted on the sequence and based on this probability
-the new token is selected.
+the length of its vocabulary $v (v \approx 30K)$. Those are interpreted as the probability of the token to be present in the current sequence.
+Finally, the logits are normalized using a SoftMax function to get a probability distribution and select the new token to be inserted.
 \end{itemize}
 
 The initialization is made only once at the beginning of the generation process, the sampling and the replacing are
@@ -185,8 +183,7 @@ For example, take the sentence "the animal didn't cross the street because it wa
 as a human it is easy to know that in the sentence the pronoun "it" refers to the subject "the animal"
 and the verb "was" is the correct conjugation of the verb "To be" for the third person, but for an
 algorithm is not easy to know these relationships and that is the task of the attention mechanism.
-
-For example, In the sentence "the animal didn't cross the street because it was too tired"
+Taking into account the same sentence
 some attention heads would focus on the verb "was", other attention heads would focus
 on the special tokens "[CLS]" and "[SEP]" that represent the beginning and the end of the sentence
 respectively, finally other attention heads would focus on the word "animal". In this way BERT can
@@ -195,20 +192,18 @@ understand which parts of the context are more relevant.
 \subsubsection{Using the attention mechanism to improve the sampling method.}
 When a token is predicted, it is possible to know which tokens of the context were more relevant to
 retrieve the prediction based on the attention weights.
-This information is a very meaningful insight to improve
+This information is a meaningful insight to improve
 the way in which the sampling method is made.
 
 We propose a new sampling method based on the attention
 weights returned by BERT when a prediction is done.
 
 \paragraph{Attention based sampling}
-First, we design a sampling method totally based on the attention weights,
-when a token was replaced in the past iteration we retrieve and summarize the
-attention information corresponded to the replaced token by means of averages
-inside and between the encoders to get a unique measure of the attention, then
-we normalize the result to get a probabilistic interpretation and make the new
-sample based on this probability, in this way we wanted to sample the more related
-tokens to the one that was replaced to check if this tokens preserve his meaning in the sequence.
+First, we design a sampling method totally based on the attention weights, when a token is replaced we retrieve
+and summarize the attention information corresponded to the replaced token using averages inside and between the
+encoders to get a unique measure of the attention, then we normalize the result to get a probabilistic interpretation
+and we make the new sample based on this probability, in this way we wanted to sample the more related tokens to the one
+that was already replaced to check if these tokens preserve his meaning in the sequence.
 
 However, we found that the attention mechanism creates very strong correlations between
 few tokens of the sequence, then the sample got stuck always choosing the same tokens among
@@ -242,13 +237,13 @@ below we describe the procedure to develop the sampling method in the iteration 
 
 In the step 1 we summarize the information of the attention inside each one of the encoders,
 then in the step 2 we combine the information of the different encoders to obtain a single
-measure of the attention, the step 4 is useful to help the method to avoid that the sampling
+measure of the attention, the step 3 set a counter,the step 4 is useful to help the method to avoid that the sampling
 method get stuck sampling always the same positions given its strong relation with the current
 context, finally the steps 5 and 6 creates a probability distribution based on the penalized attention
 and sample the new token to be replaced.
 
 Finally, in the Figure \ref{fig:AttentComp} it is possible to see how the probability of choose a token evolves
-during the iterations for each one of the tokens, it is possible to note how the attention method
+during the iterations, it is possible to note how the attention method
 get stuck during several iterations in the same areas of the sequence, for example, during the iterations
 10 to 16, the probability was focus on the last 4 tokens of the sequence.
 While in the penalized attention is possible to see a more balance probability distribution inside each iteration
@@ -333,13 +328,14 @@ In addition, this method will allow the possibility to consider even more than t
 \cline{2-5}
 \multicolumn{1}{c}{\multirow{}{}{Parameter}}                           & \begin{tabular}[c]{@{}l@{}}Parallel\\ 1\end{tabular} & \begin{tabular}[c]{@{}l@{}}Parallel\\ 0.15\end{tabular} & Sequential & Attention  \\
 \hline
-Avg\_len                                       & 40        & 40           & 40         & 40         \\
+%Avg\_len                                       & 40        & 40           & 40         & 40         \\
 Std\_len                                       & 5         & 0            & 5          & 0          \\
 Masked\_p                                      & 1         & 0.15         & 1          & 1          \\
-Sample                                         & True      & True         & True       & True       \\
+%Sample                                         & True      & True         & True       & True       \\
 Init\_mask\_p                                  & 1         & 1            & 0          & 1          \\
-Temperature                                    & 1         & 1            & 1          & 1          \\
+%Temperature                                    & 1         & 1            & 1          & 1          \\
 Top\_k                                         & 0         & 100          & 100        & 100        \\
+Iterations                                         & 500         & 500          & 500        & 200        \\
 \hline
 \end{tabular}
 \caption{Parameters configuration of the best models obtained for each generation method.}
@@ -386,20 +382,18 @@ In this sense, it is not simple to evaluate a text generator model based on a si
 % Corpus Bleu, perplexity and rouge
 % Self-Bleu and n-Grams
 
-We have made a Grid Search to analyze the behavior of the generations with the variation of the parameters,
-and to choose the best combination of parameters for each one of the sampling methods. For each one of the
-combinations of parameters we have made five different generations each one with 500 text lines generated,
+We have made a Grid Search to analyze the behavior of the generations and to identify the best combination of parameters for each one of the sampling methods.
+For each one of the different combinations of parameters we have made five different generations each one with 50 text lines,
 then we calculated different measures to analyze the quality and the diversity of the generations like
-Corpus-Bleu on Wikitex-103 and TBC, rough and \%Unique-Ngrams. We select the three bests models for each
-generation method by means of comparing all the measures. Finally, we generated 1000 text lines with each one
-of the models, we evaluate the final generations and based on the results we choose the best combination of
-parameters for each model, in table \ref{tab:parameters} we report the parameters of each model.
+Bleu on Wikitex-103 (WT103) and TBC using the Texygen library \cite{texygen}, rouge and \%Unique-Ngrams. We select the three best models for each
+generation method. Finally, we generated 1000 text lines with each one
+of the selected models, we evaluate the final generations and based on the results we choose the best combination of
+parameters for each generation method, in table \ref{tab:parameters} we report the obtained results.
 
 In table \ref{tab:parameters}, we report the Bleu scores with respect to WT103 and TBC for the best models we found,
-the results of the original paper \cite{wang2019bert}, the results of the original paper but evaluating the generated
-text with the Texygen library, and a RNN we trained on WT103.5 and TBC, in the following section we discuss more about
-the RNN model. It is possible to note that the proposed attention method is very near of the base line marked by the
-original paper, even outperforming the base line in the corpus-Bleu measure with respect to WT103.
+the results reported on \cite{wang2019bert} and its corresponding using TexiGen as evaluator, and our RNN trained on WT103.5 and TBC.
+It is possible to note that the proposed attention method is very near of the base line marked by \cite{wang2019bert},
+even outperforming the base line in the Bleu measure with respect to WT103.
 \subsection{Convergence of the attention sampling method}
 We have compared also the converge of the attention method with respect to the original sampling method (parallel).
 To do this we have run 80 generation experiments. Each sentence was initialized with a list of 25 [MASK] tokens and
