@@ -572,4 +572,58 @@ in order to help the generation method to not get stuck in the early stages of t
 \bibliography{egbib}
 
 \section*{Appendix}\label{sec:appendix}
+
+%\begin{figure}
+%\centering
+%\includegraphics[width=\linewidth]{dante1.png}
+%\caption{Average recall score of unigrams and bigrams w.r.t WikiText-103
+%at each iteration. The dashed lines correspond to the avg num of iterations needed
+%to replace the initial mask tokens}
+%\label{fig:Recall}
+%\end{figure}
+%\begin{figure}
+%\centering
+%\includegraphics[width=\linewidth]{dante2.png}
+%\caption{Average recall score of unigrams and bigrams w.r.t WikiText-103
+%at each iteration. The dashed lines correspond to the avg num of iterations needed
+%to replace the initial mask tokens}
+%\label{fig:Recall}
+%   \newpage
+%\end{figure}
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{quotes.png}
+\caption{Examples of generation of quotes from eperiment 1}
+\end{figure}
+
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{tweets.png}
+\caption{Examples of generations of tweets with sentiment (3rd experiment). The tweets are separated by sentiment (POSITIVE/NEGATIVE).
+In addition, for each sentence we used "Ronaldo" as seed to start the generation.
+}
+\label{fig:tweets}
+\end{figure}
+\clearpage
+\mbox{~}
+
+
+\begin{figure}[ht]
+\centering
+\begin{subfigure}{.5\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{dante1.png}
+  \label{fig:dante1}
+\end{subfigure}%
+\begin{subfigure}{.5\linewidth}
+  \centering
+  \includegraphics[width=\linewidth]{dante2.png}
+  \label{fig:sub1}
+\end{subfigure}%
+\caption{Two examples of generation after fine-tuning the model on Dante's Divine Comedy, from experiment 2}
+\label{fig:test}
+\end{figure}
+
+
 \end{document}
